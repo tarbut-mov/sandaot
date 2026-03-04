@@ -623,11 +623,11 @@ function generateWAMessage() {
   if (w.ages && agesType) {
     var agesLabel;
     if (agesType === 'גמיש') {
-      agesLabel = /[א-ת]/.test(w.ages) ? 'כיתות: ' : 'גילאים: ';
+      agesLabel = /[א-ת]/.test(w.ages) ? 'לכיתות ' : 'לגילאי ';
     } else if (agesType === 'כיתות') {
-      agesLabel = 'כיתות: ';
+      agesLabel = 'לכיתות ';
     } else {
-      agesLabel = 'גילאים: ';
+      agesLabel = 'לגילאי ';
     }
     parts.push(agesLabel + w.ages);
   }
@@ -950,7 +950,7 @@ function formatAges(ages) {
   if (!ages) return '';
   // אם מכיל אותיות עבריות — כיתות, אחרת — גילאים
   if (/[א-ת]/.test(ages)) return 'כיתות: ' + ages;
-  return 'גילאים: ' + ages;
+  return 'לגילאי ' + ages;
 }
 
 function showToast(msg) {
