@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>מערך סדנאות זום</title>
+<title>תרבות מהבית</title>
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -618,8 +618,8 @@ function generateWAMessage() {
   } else {
     dayLine = 'ביום ' + (w.day ? w.day + ' ' : '') + (w.dateStr ? '(' + w.dateStr + ') ' : '') + timeStr + ' ניפגש לסדנת ' + w.name;
   }
-  parts.push(dayLine);
   var agesType = getSetting('גילאים_' + w.audience, '');
+  var agesLine = '';
   if (w.ages && agesType) {
     var agesLabel;
     if (agesType === 'גמיש') {
@@ -629,8 +629,9 @@ function generateWAMessage() {
     } else {
       agesLabel = 'לגילאי ';
     }
-    parts.push(agesLabel + w.ages);
+    agesLine = '. הסדנא מיועדת ' + agesLabel + w.ages;
   }
+  parts.push(dayLine + agesLine);
   parts.push('');
 
   if (w.zoomLink) { parts.push(w.zoomLink); parts.push(''); }
@@ -651,7 +652,9 @@ function generateWAMessage() {
   parts.push('https://tarbut-mov.github.io/sandaot/join');
   parts.push('');
 
-  if (withReg) {
+  // אוטומטי: אם יש /register/ בקישור זום — הוסף שאלון
+  var hasReg = w.zoomLink && w.zoomLink.indexOf('/register/') !== -1;
+  if (hasReg || withReg) {
     parts.push(getSetting('שורת_שאלון', 'שימו ❤️ הכניסה לסדנא מותנית במענה על שאלון פרטים קצר על מנת שנוכל לשמור איתכם על קשר.'));
   }
 
@@ -950,7 +953,7 @@ function formatAges(ages) {
   if (!ages) return '';
   // אם מכיל אותיות עבריות — כיתות, אחרת — גילאים
   if (/[א-ת]/.test(ages)) return 'כיתות: ' + ages;
-  return 'לגילאי ' + ages;
+  return 'גילאים: ' + ages;
 }
 
 function showToast(msg) {
