@@ -287,6 +287,7 @@ var SHEET_NAME = 'סדנאות'; // שם הטאב בשיט
 var INSTRUCTORS_SHEET_ID = '1Alx8bVriD2AB19cW75Wq5YAMO8tanLIJvvX8qe_X-w8';
 var WA_GROUPS_SHEET_NAME = 'קישורים לקבוצות ווטסאפ';
 var ZOOM_SHEET_NAME = 'חשבונות זום';
+var SETTINGS_SHEET_NAME = 'פורמט הודעה';
 
 // עמודות — חייבות להתאים לשורת הכותרת בשיט (A, B, C...)
 // A=name, B=desc, C=audience, D=day, E=start, F=end,
@@ -297,6 +298,7 @@ var ZOOM_SHEET_NAME = 'חשבונות זום';
 var workshops = [];
 var instructors = [];
 var waGroupsCache = [];
+var msgSettings = {};
 var currentFilter = 'all';
 
 var AUDIENCE_COLORS = {
@@ -605,7 +607,7 @@ function generateWAMessage() {
   var w = workshops.find(function(x) { return x.id === id; });
   if (!w) return;
 
-  var greeting = (AUDIENCE_GREETING[w.audience] !== undefined) ? AUDIENCE_GREETING[w.audience] : 'שלום,';
+  var greeting = getSetting('פתיחה_' + w.audience, AUDIENCE_GREETING[w.audience] || 'שלום,');
   var parts = [];
   if (greeting) { parts.push(greeting); parts.push(''); }
 
@@ -617,29 +619,40 @@ function generateWAMessage() {
     dayLine = 'ביום ' + (w.day ? w.day + ' ' : '') + (w.dateStr ? '(' + w.dateStr + ') ' : '') + timeStr + ' ניפגש לסדנת ' + w.name;
   }
   parts.push(dayLine);
-  if (w.ages) parts.push('(' + w.ages + ')');
+  var agesType = getSetting('גילאים_' + w.audience, '');
+  if (w.ages && agesType) {
+    var agesLabel;
+    if (agesType === 'גמיש') {
+      agesLabel = /[א-ת]/.test(w.ages) ? 'כיתות: ' : 'גילאים: ';
+    } else if (agesType === 'כיתות') {
+      agesLabel = 'כיתות: ';
+    } else {
+      agesLabel = 'גילאים: ';
+    }
+    parts.push(agesLabel + w.ages);
+  }
   parts.push('');
 
   if (w.zoomLink) { parts.push(w.zoomLink); parts.push(''); }
 
   if (w.equipment) {
-    parts.push('לקראת הסדנה, יש להכין:');
+    parts.push(getSetting('שורת_ציוד', 'לקראת הסדנה, יש להכין:'));
     parts.push(w.equipment);
     parts.push('');
   }
 
   if (w.earlyAge === 'TRUE') {
-    parts.push('הסדנה מתאימה גם לגיל הרך');
+    parts.push(getSetting('שורת_גיל_הרך', 'הסדנה מתאימה גם לגיל הרך'));
     parts.push('');
   }
 
 
-  parts.push('מוזמנים להפיץ את הקבוצה להצטרפות של חברים נוספים בקישור -');
+  parts.push(getSetting('שורת_הפצה', 'מוזמנים להפיץ את הקבוצה להצטרפות של חברים נוספים בקישור -'));
   parts.push('https://tarbut-mov.github.io/sandaot/join');
   parts.push('');
 
   if (withReg) {
-    parts.push('שימו ❤️ הכניסה לסדנא מותנית במענה על שאלון פרטים קצר על מנת שנוכל לשמור איתכם על קשר.');
+    parts.push(getSetting('שורת_שאלון', 'שימו ❤️ הכניסה לסדנא מותנית במענה על שאלון פרטים קצר על מנת שנוכל לשמור איתכם על קשר.'));
   }
 
   var msg = parts.join('\n').replace(/\n\n\n+/g, '\n\n').trim();
@@ -907,6 +920,39 @@ function getBestWALink(audience) {
   return null;
 }
 
+
+function loadMsgSettings() {
+  var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID +
+    '/gviz/tq?tqx=out:json&headers=1&sheet=' + encodeURIComponent(SETTINGS_SHEET_NAME) + '&t=' + Date.now();
+  fetch(url)
+    .then(function(r) { return r.text(); })
+    .then(function(text) {
+      var json = text.replace(/^[^(]+\(/, '').replace(/\);?$/, '');
+      var data = JSON.parse(json);
+      var h = [];
+      if (data.table.cols) data.table.cols.forEach(function(c) { h.push(c && c.label ? c.label.trim() : ''); });
+      var ki = h.indexOf('מפתח'), vi = h.indexOf('ערך');
+      if (ki === -1 || vi === -1) return;
+      data.table.rows.forEach(function(row) {
+        if (!row.c) return;
+        var key = (row.c[ki] && row.c[ki].v) ? String(row.c[ki].v).trim() : '';
+        var val = (row.c[vi] && row.c[vi].v) ? String(row.c[vi].v).trim() : '';
+        if (key) msgSettings[key] = val;
+      });
+    }).catch(function() {});
+}
+
+function getSetting(key, fallback) {
+  return msgSettings[key] || fallback;
+}
+
+function formatAges(ages) {
+  if (!ages) return '';
+  // אם מכיל אותיות עבריות — כיתות, אחרת — גילאים
+  if (/[א-ת]/.test(ages)) return 'כיתות: ' + ages;
+  return 'גילאים: ' + ages;
+}
+
 function showToast(msg) {
   var t = document.getElementById('toast');
   t.textContent = msg;
@@ -921,6 +967,7 @@ document.querySelectorAll('.modal-overlay').forEach(function(o) {
 // Load on startup
 loadFromSheet();
 loadWAGroupsCache();
+loadMsgSettings();
 </script>
 </body>
 </html>
