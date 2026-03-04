@@ -465,7 +465,14 @@ function showView(name, btn) {
 }
 
 function renderWorkshops() {
-  var filtered = currentFilter === 'all' ? workshops : workshops.filter(function(w) { return w.audience === currentFilter; });
+  var today = new Date(); today.setHours(0,0,0,0);
+  var showAll = document.getElementById('show-all-dates') && document.getElementById('show-all-dates').checked;
+  var baseList = showAll ? workshops : workshops.filter(function(w) {
+    if (!w.date) return true;
+    var d = parseDate(w.date);
+    return !d || d >= today;
+  });
+  var filtered = currentFilter === 'all' ? baseList : baseList.filter(function(w) { return w.audience === currentFilter; });
   var audiences = [];
   workshops.forEach(function(w) { if (w.audience && audiences.indexOf(w.audience) === -1) audiences.push(w.audience); });
   var zoomAccs = [];
@@ -477,7 +484,8 @@ function renderWorkshops() {
     '<div class="stat-card"><div class="stat-num" style="color:var(--accent2)">' + zoomAccs.length + '</div><div class="stat-label">חשבונות זום</div></div>' +
     '<div class="stat-card"><div class="stat-num" style="color:var(--yellow)">' + workshops.filter(function(w){return w.waGroup;}).length + '</div><div class="stat-label">עם קבוצת ווטסאפ</div></div>';
 
-  var filtersHtml = '<button class="filter-btn ' + (currentFilter==='all'?'active':'') + '" onclick="filterWorkshops(\'all\')">הכל</button>';
+  var filtersHtml = '<label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);cursor:pointer"><input type="checkbox" id="show-all-dates" onchange="renderWorkshops()" style="accent-color:var(--accent)"> הצג ימים שעברו</label>';
+  filtersHtml += '<button class="filter-btn ' + (currentFilter==='all'?'active':'') + '" onclick="filterWorkshops(\'all\')">הכל</button>';
   audiences.forEach(function(a) {
     filtersHtml += '<button class="filter-btn ' + (currentFilter===a?'active':'') + '" onclick="filterWorkshops(\'' + a + '\')">' + a + '</button>';
   });
@@ -583,7 +591,9 @@ function loadWAGroups() {
 function renderWAView() {
   var sel = document.getElementById('wa-select');
   sel.innerHTML = '<option value="">— בחר סדנה —</option>';
+  var todayWA = new Date(); todayWA.setHours(0,0,0,0);
   workshops.forEach(function(w) {
+    if (w.date) { var dWA = parseDate(w.date); if (dWA && dWA < todayWA) return; }
     sel.innerHTML += '<option value="' + w.id + '">' + w.name + ' | יום ' + (w.day||'?') + ' ' + (w.start||'') + '</option>';
   });
   // טען קישורים מהטאב הייעודי
@@ -592,6 +602,14 @@ function renderWAView() {
 
 function generateWAMessage() {
   var id = document.getElementById('wa-select').value;
+  // אוטומטי: סמן תיבת שאלון אם יש /register/ בקישור
+  if (id) {
+    var ws = workshops.find(function(x) { return x.id === id; });
+    if (ws) {
+      var regBox = document.getElementById('wa-registration');
+      if (regBox) regBox.checked = ws.zoomLink && ws.zoomLink.indexOf('/register/') !== -1;
+    }
+  }
   var box = document.getElementById('wa-message-box');
   var btnWa = document.getElementById('btn-open-wa');
   var flyerRow = document.getElementById('wa-flyer-row');
@@ -653,8 +671,7 @@ function generateWAMessage() {
   parts.push('');
 
   // אוטומטי: אם יש /register/ בקישור זום — הוסף שאלון
-  var hasReg = w.zoomLink && w.zoomLink.indexOf('/register/') !== -1;
-  if (hasReg || withReg) {
+  if (withReg) {
     parts.push(getSetting('שורת_שאלון', 'שימו ❤️ הכניסה לסדנא מותנית במענה על שאלון פרטים קצר על מנת שנוכל לשמור איתכם על קשר.'));
   }
 
