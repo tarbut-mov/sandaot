@@ -251,6 +251,7 @@
   <!-- ZOOM VIEW -->
   <div class="view" id="view-zoom">
     <div class="page-title">ניהול חשבונות זום</div>
+    <div style="margin-bottom:16px"><label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);cursor:pointer"><input type="checkbox" id="zoom-show-past" onchange="renderZoomView()" style="accent-color:var(--accent)"> הצג זומים שכבר היו</label></div>
     <div class="zoom-grid" id="zoom-grid"></div>
   </div>
 
@@ -755,7 +756,13 @@ function renderZoomView() {
       var DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שישי'];
       var html = '';
       accounts.forEach(function(acc) {
-        var accWs = workshops.filter(function(w) { return w.zoomAcc === acc.name; });
+        var showPast = document.getElementById('zoom-show-past') && document.getElementById('zoom-show-past').checked;
+        var todayZoom = new Date(); todayZoom.setHours(0,0,0,0);
+        var accWs = workshops.filter(function(w) {
+          if (w.zoomAcc !== acc.name) return false;
+          if (!showPast && w.date) { var d = parseDate(w.date); if (d && d < todayZoom) return false; }
+          return true;
+        });
         var slots = '';
         DAYS.forEach(function(day) {
           accWs.filter(function(w){ return w.day === day; }).forEach(function(w) {
