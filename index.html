@@ -770,10 +770,14 @@ function renderZoomView() {
           return true;
         });
         var slots = '';
-        DAYS.forEach(function(day) {
-          accWs.filter(function(w){ return w.day === day; }).forEach(function(w) {
-            slots += '<div class="zoom-slot"><div><div style="font-weight:600;font-size:13px">' + w.name + '</div><div style="font-size:11px;color:var(--text-muted)">' + (w.audience||'') + '</div></div><div class="zoom-slot-time">יום ' + day + '<br>' + (w.start||'') + '–' + (w.end||'') + '</div></div>';
-          });
+        accWs.sort(function(a, b) {
+          var da = parseDate(a.date), db = parseDate(b.date);
+          if (!da && !db) return 0; if (!da) return 1; if (!db) return -1;
+          if (da - db !== 0) return da - db;
+          return (a.start || '').localeCompare(b.start || '');
+        });
+        accWs.forEach(function(w) {
+          slots += '<div class="zoom-slot"><div><div style="font-weight:600;font-size:13px">' + w.name + '</div><div style="font-size:11px;color:var(--text-muted)">' + (w.audience||'') + '</div></div><div class="zoom-slot-time">יום ' + (w.day||'') + ' ' + (w.dateStr||'') + '<br>' + (w.start||'') + '–' + (w.end||'') + '</div></div>';
         });
         var details = '';
         if (acc.email) details += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">📧 ' + acc.email + '</div>';
