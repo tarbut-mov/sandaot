@@ -677,7 +677,7 @@ function generateWAMessage() {
   parts.push(dayLine + agesLine);
   parts.push('');
 
-  if (w.zoomLink) { parts.push(w.zoomLink); parts.push(''); }
+  if (w.zoomLink) { parts.push('בקישור: ');parts.push(w.zoomLink); parts.push(''); }
 
   if (w.equipment) {
     parts.push(getSetting('שורת_ציוד', 'לקראת הסדנה, יש להכין:'));
