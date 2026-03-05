@@ -524,12 +524,23 @@ function renderWorkshops() {
     '<div class="stat-card"><div class="stat-num" style="color:var(--yellow)">' + workshops.filter(function(w){return w.waGroup;}).length + '</div><div class="stat-label">עם קבוצת ווטסאפ</div></div>';
 
   var showAllChecked = document.getElementById('show-all-dates') && document.getElementById('show-all-dates').checked;
-  var filtersHtml = '<label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);cursor:pointer"><input type="checkbox" id="show-all-dates" ' + (showAllChecked ? 'checked' : '') + ' onchange="renderWorkshops()" style="accent-color:var(--accent)"> הצג ימים שעברו</label>';
-  filtersHtml += '<button class="filter-btn ' + (currentFilter==='all'?'active':'') + '" onclick="filterWorkshops(\'all\')">הכל</button>';
-  audiences.forEach(function(a) {
-    filtersHtml += '<button class="filter-btn ' + (currentFilter===a?'active':'') + '" onclick="filterWorkshops(\'' + a + '\')">' + a + '</button>';
-  });
-  document.getElementById('filters-row').innerHTML = filtersHtml;
+  var filtersRow = document.getElementById('filters-row');
+  filtersRow.innerHTML = '';
+
+  var showAllLabel = document.createElement('label');
+  showAllLabel.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);cursor:pointer';
+  showAllLabel.innerHTML = '<input type="checkbox" id="show-all-dates" ' + (showAllChecked ? 'checked' : '') + ' onchange="renderWorkshops()" style="accent-color:var(--accent)"> הצג ימים שעברו';
+  filtersRow.appendChild(showAllLabel);
+
+  function makeFilterBtn(label, val) {
+    var btn = document.createElement('button');
+    btn.className = 'filter-btn' + (currentFilter === val ? ' active' : '');
+    btn.textContent = label;
+    btn.onclick = function() { filterWorkshops(val); };
+    filtersRow.appendChild(btn);
+  }
+  makeFilterBtn('הכל', 'all');
+  audiences.forEach(function(a) { makeFilterBtn(a, a); });
 
   var grid = document.getElementById('workshops-grid');
   if (filtered.length === 0) {
@@ -537,7 +548,7 @@ function renderWorkshops() {
     return;
   }
   grid.innerHTML = filtered.map(function(w) {
-    return '<div class="workshop-card" onclick="openDetail(\'' + w.id + '\')">' +
+    return '<div class="workshop-card" onclick="openDetail(\'' + w.id + '")">' +
       '<div><div class="workshop-name">' + w.name + '</div><div class="workshop-desc">' + (w.desc||'—') + '</div></div>' +
       '<div><span class="badge ' + (AUDIENCE_COLORS[w.audience]||'badge-blue') + '">' + (w.audience||'—') + '</span>' + (w.ages ? '<div style="font-size:11px;color:var(--text-muted);margin-top:4px">' + w.ages + '</div>' : '') + '</div>' +
       '<div class="time-block">' + (w.isToday ? '<span style="color:var(--green);font-size:11px">היום</span> ' : 'יום ' + (w.day||'')) + ' ' + (w.dateStr||'') + '<span>' + (w.start||'—') + ' – ' + (w.end||'—') + '</span></div>' +
