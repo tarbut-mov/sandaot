@@ -487,6 +487,12 @@ function renderWorkshops() {
     return !d || d >= today;
   });
   var filtered = currentFilter === 'all' ? baseList : baseList.filter(function(w) { return w.audience === currentFilter; });
+  filtered.sort(function(a, b) {
+    var da = parseDate(a.date), db = parseDate(b.date);
+    if (!da && !db) return 0; if (!da) return 1; if (!db) return -1;
+    if (da - db !== 0) return da - db;
+    return (a.start || '').localeCompare(b.start || '');
+  });
   var audiences = [];
   workshops.forEach(function(w) { if (w.audience && audiences.indexOf(w.audience) === -1) audiences.push(w.audience); });
   var zoomAccs = [];
@@ -1006,38 +1012,98 @@ function renderSchedule() {
     'אקו': '#b07ef7', 'ערבית': '#f7774f'
   };
 
-  // בנה רשימת שעות ייחודיות ממוינות
-  var times = [];
+  // קבץ סדנאות לפי שבוע (ראשון בשבוע = ראשון)
+  function getWeekStart(d) {
+    var date = new Date(d);
+    var day = date.getDay(); // 0=sun
+    date.setDate(date.getDate() - day);
+    date.setHours(0,0,0,0);
+    return date;
+  }
+
+  var weeks = {}; // key=weekStart.getTime() → {label, days: {dayName → [workshops]}}
   workshops.forEach(function(w) {
-    if (w.start && times.indexOf(w.start) === -1) times.push(w.start);
+    if (!w.date) return;
+    var d = parseDate(w.date);
+    if (!d) return;
+    var ws = getWeekStart(d);
+    var key = ws.getTime();
+    if (!weeks[key]) {
+      var end = new Date(ws); end.setDate(end.getDate() + 4);
+      var fmt = function(dt) { return dt.getDate() + '/' + (dt.getMonth()+1); };
+      weeks[key] = { label: fmt(ws) + ' – ' + fmt(end), start: ws, days: {} };
+    }
+    var dayName = DAYS_HE[d.getDay()];
+    if (!weeks[key].days[dayName]) weeks[key].days[dayName] = [];
+    weeks[key].days[dayName].push(w);
+  });
+
+  var weekKeys = Object.keys(weeks).map(Number).sort(function(a,b){return a-b;});
+  if (weekKeys.length === 0) {
+    document.getElementById('schedule-container').innerHTML = '<div class="empty"><div class="empty-icon">📅</div><div>אין סדנאות להצגה</div></div>';
+    return;
+  }
+
+  // טאבים
+  var tabsHtml = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">';
+  weekKeys.forEach(function(k, i) {
+    tabsHtml += '<button id="week-tab-' + k + '" onclick="showWeekTab(' + k + ')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);font-family:Heebo,sans-serif;font-size:13px;padding:7px 16px;border-radius:20px;cursor:pointer">' + weeks[k].label + '</button>';
+  });
+  tabsHtml += '</div><div id="week-content"></div>';
+  document.getElementById('schedule-container').innerHTML = tabsHtml;
+
+  window._scheduleWeeks = weeks;
+  window._scheduleDays = DAYS;
+  window._scheduleColors = AUDIENCE_COLORS_MAP;
+
+  // הצג שבוע ראשון
+  showWeekTab(weekKeys[0]);
+}
+
+function showWeekTab(key) {
+  var weeks = window._scheduleWeeks;
+  var DAYS = window._scheduleDays;
+  var AUDIENCE_COLORS_MAP = window._scheduleColors;
+  if (!weeks || !weeks[key]) return;
+
+  // עדכן טאבים
+  Object.keys(weeks).forEach(function(k) {
+    var btn = document.getElementById('week-tab-' + k);
+    if (btn) {
+      btn.style.background = Number(k) === Number(key) ? 'var(--accent)' : 'var(--surface2)';
+      btn.style.color = Number(k) === Number(key) ? 'white' : 'var(--text-muted)';
+      btn.style.borderColor = Number(k) === Number(key) ? 'var(--accent)' : 'var(--border)';
+    }
+  });
+
+  var week = weeks[key];
+  var times = [];
+  Object.values(week.days).forEach(function(ws) {
+    ws.forEach(function(w) { if (w.start && times.indexOf(w.start) === -1) times.push(w.start); });
   });
   times.sort();
 
-  // בנה מיפוי יום+שעה → סדנאות
-  var map = {};
-  workshops.forEach(function(w) {
-    if (!w.day || !w.start) return;
-    var key = w.day + '|' + w.start;
-    if (!map[key]) map[key] = [];
-    map[key].push(w);
-  });
-
-  var cellStyle = 'border:1px solid #2e3148;padding:10px 12px;vertical-align:top;min-width:160px;';
+  var cellStyle = 'border:1px solid #2e3148;padding:10px 12px;vertical-align:top;min-width:160px;background:#1a1d27;';
   var headerStyle = 'background:#1a1d27;color:#8890a8;font-size:12px;font-weight:700;text-align:center;padding:10px;border:1px solid #2e3148;';
   var timeStyle = 'background:#1a1d27;color:#8890a8;font-size:12px;font-weight:600;padding:10px 14px;border:1px solid #2e3148;white-space:nowrap;text-align:center;';
 
+  var activeDays = DAYS.filter(function(d) { return week.days[d] && week.days[d].length > 0; });
+
   var html = '<table id="schedule-table" style="border-collapse:collapse;width:100%;background:#0f1117;font-family:Heebo,sans-serif;direction:rtl">';
-  // Header row
   html += '<thead><tr><th style="' + headerStyle + '">שעה</th>';
-  DAYS.forEach(function(d) { html += '<th style="' + headerStyle + '">יום ' + d + '</th>'; });
+  activeDays.forEach(function(d) {
+    // מצא תאריך היום
+    var dayDate = '';
+    if (week.days[d] && week.days[d][0]) dayDate = week.days[d][0].dateStr || '';
+    html += '<th style="' + headerStyle + '">יום ' + d + '<br><span style="font-weight:400;font-size:11px">' + dayDate + '</span></th>';
+  });
   html += '</tr></thead><tbody>';
 
   times.forEach(function(time) {
     html += '<tr><td style="' + timeStyle + '">' + time + '</td>';
-    DAYS.forEach(function(day) {
-      var key = day + '|' + time;
-      var cells = map[key] || [];
-      html += '<td style="' + cellStyle + 'background:#1a1d27;">';
+    activeDays.forEach(function(day) {
+      var cells = (week.days[day] || []).filter(function(w){ return w.start === time; });
+      html += '<td style="' + cellStyle + '">';
       cells.forEach(function(w) {
         var color = AUDIENCE_COLORS_MAP[w.audience] || '#4f8ef7';
         html += '<div style="background:' + color + '18;border-right:3px solid ' + color + ';border-radius:6px;padding:8px 10px;margin-bottom:6px">' +
@@ -1052,9 +1118,8 @@ function renderSchedule() {
   });
 
   html += '</tbody></table>';
-  document.getElementById('schedule-container').innerHTML = times.length > 0 ? html : '<div class="empty"><div class="empty-icon">📅</div><div>אין סדנאות להצגה</div></div>';
+  document.getElementById('week-content').innerHTML = activeDays.length > 0 ? html : '<div style="color:var(--text-muted);padding:20px">אין סדנאות בשבוע זה</div>';
 }
-
 function exportScheduleExcel() {
   var DAYS = ['ראשון','שני','שלישי','רביעי','חמישי'];
   var times = [];
