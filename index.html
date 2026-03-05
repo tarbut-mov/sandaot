@@ -272,7 +272,7 @@
       <span class="sync-status" id="instr-sync-status"></span>
     </div>
     <div class="notice">
-      נתונים מתוך <a href="https://docs.google.com/spreadsheets/d/1A6EPgnd0cax-KDjGtV1D1mXnhNE1mie1FCJLljybEgI/edit?gid=1372414241#gid=1372414241" target="_blank">שיט תגובות הפורמז</a>. לחץ על מנחה לפרטים מלאים.
+      נתונים מתוך <a href="https://docs.google.com/spreadsheets/d/1Alx8bVriD2AB19cW75Wq5YAMO8tanLIJvvX8qe_X-w8/edit" target="_blank">שיט תגובות הפורמז</a>. לחץ על מנחה לפרטים מלאים.
     </div>
     <div id="instructors-loading" class="loading-bar" style="display:none"><div class="spinner"></div>טוען מנחים...</div>
     <div class="instructors-grid" id="instructors-grid"></div>
@@ -387,7 +387,7 @@ function loadFromSheet() {
   fetch(url)
     .then(function(r) { return r.text(); })
     .then(function(text) {
-      var json = text.replace(/^[^(]+\(/, '').replace(/\);?$/, '');
+      var json = text.replace(/^\/\*[^*]*\*\/\s*/, '').replace(/^[\s\S]*?\(/, '').replace(/\);?\s*$/, '');
       var data = JSON.parse(json);
       handleSheetData(data);
     })
@@ -564,7 +564,7 @@ function loadWAGroups() {
   fetch(url)
     .then(function(r) { return r.text(); })
     .then(function(text) {
-      var json = text.replace(/^[^(]+\(/, '').replace(/\);?$/, '');
+      var json = text.replace(/^\/\*[^*]*\*\/\s*/, '').replace(/^[\s\S]*?\(/, '').replace(/\);?\s*$/, '');
       var data = JSON.parse(json);
       var headers = [];
       if (data.table.cols) data.table.cols.forEach(function(c) { headers.push(c && c.label ? c.label.trim() : ''); });
@@ -729,7 +729,7 @@ function renderZoomView() {
   fetch(url)
     .then(function(r) { return r.text(); })
     .then(function(text) {
-      var json = text.replace(/^[^(]+\(/, '').replace(/\);?$/, '');
+      var json = text.replace(/^\/\*[^*]*\*\/\s*/, '').replace(/^[\s\S]*?\(/, '').replace(/\);?\s*$/, '');
       var data = JSON.parse(json);
 
       var headers = [];
@@ -794,11 +794,11 @@ function loadInstructors() {
   statusEl.textContent = 'טוען...';
   if (loadingEl) loadingEl.style.display = 'flex';
 
-  var url = 'https://docs.google.com/spreadsheets/d/' + INSTRUCTORS_SHEET_NAME + '/gviz/tq?tqx=out:json&t=' + Date.now();
+  var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/gviz/tq?tqx=out:json&headers=1&sheet=' + encodeURIComponent(INSTRUCTORS_SHEET_NAME) + '&t=' + Date.now();
   fetch(url)
     .then(function(r) { return r.text(); })
     .then(function(text) {
-      var json = text.replace(/^[^(]+\(/, '').replace(/\);?$/, '');
+      var json = text.replace(/^\/\*[^*]*\*\/\s*/, '').replace(/^[\s\S]*?\(/, '').replace(/\);?\s*$/, '');
       var data = JSON.parse(json);
       handleInstructorsData(data);
     })
@@ -938,7 +938,7 @@ function loadWAGroupsCache() {
   fetch(url)
     .then(function(r) { return r.text(); })
     .then(function(text) {
-      var json = text.replace(/^[^(]+\(/, '').replace(/\);?$/, '');
+      var json = text.replace(/^\/\*[^*]*\*\/\s*/, '').replace(/^[\s\S]*?\(/, '').replace(/\);?\s*$/, '');
       var data = JSON.parse(json);
       var headers = [];
       if (data.table.cols) data.table.cols.forEach(function(c) { headers.push(c && c.label ? c.label.trim() : ''); });
@@ -972,7 +972,7 @@ function loadMsgSettings() {
   fetch(url)
     .then(function(r) { return r.text(); })
     .then(function(text) {
-      var json = text.replace(/^[^(]+\(/, '').replace(/\);?$/, '');
+      var json = text.replace(/^\/\*[^*]*\*\/\s*/, '').replace(/^[\s\S]*?\(/, '').replace(/\);?\s*$/, '');
       var data = JSON.parse(json);
       var h = [];
       if (data.table.cols) data.table.cols.forEach(function(c) { h.push(c && c.label ? c.label.trim() : ''); });
