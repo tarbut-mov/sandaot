@@ -193,6 +193,7 @@
     <button onclick="showView('zoom',this)">ניהול זום</button>
     <button onclick="showView('instructors',this)">מנחים</button>
     <button onclick="showView('schedule',this)">מערכת שעות</button>
+    <button onclick="showView('daily',this)">יומן היום</button>
   </nav>
 </header>
 
@@ -224,6 +225,12 @@
   <div class="view" id="view-whatsapp">
     <div class="page-title">הודעות ווטסאפ</div>
     <div class="wa-section">
+      <div class="wa-title">סוג הודעה</div>
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+        <button id="msg-type-early" class="filter-btn active" onclick="setMsgType('early',this)">הודעה מקדימה</button>
+        <button id="msg-type-30" class="filter-btn" onclick="setMsgType('30',this)">חצי שעה לפני</button>
+        <button id="msg-type-now" class="filter-btn" onclick="setMsgType('now',this)">בתחילת הסדנא</button>
+      </div>
       <div class="wa-title">בחר סדנה</div>
       <select class="form-select" id="wa-select" onchange="onWorkshopSelect()" style="width:100%">
         <option value="">— בחר סדנה —</option>
@@ -253,6 +260,12 @@
     <div class="page-title">ניהול חשבונות זום</div>
     <div style="margin-bottom:16px"><label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);cursor:pointer"><input type="checkbox" id="zoom-show-past" onchange="renderZoomView()" style="accent-color:var(--accent)"> הצג זומים שכבר היו</label></div>
     <div class="zoom-grid" id="zoom-grid"></div>
+  </div>
+
+  <!-- DAILY VIEW -->
+  <div id="view-daily" class="view">
+    <div class="page-title">יומן היום</div>
+    <div id="daily-container"></div>
   </div>
 
   <!-- SCHEDULE VIEW -->
@@ -476,6 +489,7 @@ function showView(name, btn) {
   if (name === 'zoom') renderZoomView();
   if (name === 'instructors') { if (instructors.length === 0) loadInstructors(); else renderInstructors(); }
   if (name === 'schedule') renderSchedule();
+  if (name === 'daily') renderDaily();
 }
 
 function renderWorkshops() {
@@ -652,16 +666,30 @@ function generateWAMessage() {
 
   var greeting = getSetting('פתיחה_' + w.audience, AUDIENCE_GREETING[w.audience] || 'שלום,');
   var parts = [];
-  if (greeting) { parts.push(greeting); }
+  if (greeting) { parts.push(greeting); parts.push(''); }
 
   var timeStr = w.start ? 'בשעה ' + w.start : '';
   var dayLine;
-  if (w.isToday) {
-    dayLine = 'היום ' + timeStr + ' ניפגש לסדנת ' + w.name;
+  var msgType = currentMsgType || 'main';
+  if (msgType === '30') {
+    dayLine = 'בעוד חצי שעה, ' + timeStr + ', תתחיל סדנת ' + w.name;
+  } else if (msgType === 'now') {
+    dayLine = 'עכשיו מתחילה סדנת ' + w.name + (w.start ? ' (' + w.start + ')' : '');
+  } else if (msgType === 'early') {
+    if (w.isToday) {
+      dayLine = 'היום ' + timeStr + ' ניפגש לסדנת ' + w.name;
+    } else {
+      dayLine = 'ביום ' + (w.day ? w.day + ' ' : '') + (w.dateStr ? '(' + w.dateStr + ') ' : '') + timeStr + ' ניפגש לסדנת ' + w.name;
+    }
   } else {
-    dayLine = 'ביום ' + (w.day ? w.day + ' ' : '') + (w.dateStr ? '(' + w.dateStr + ') ' : '') + timeStr + ' ניפגש לסדנת ' + w.name;
+    if (w.isToday) {
+      dayLine = 'היום ' + timeStr + ' ניפגש לסדנת ' + w.name;
+    } else {
+      dayLine = 'ביום ' + (w.day ? w.day + ' ' : '') + (w.dateStr ? '(' + w.dateStr + ') ' : '') + timeStr + ' ניפגש לסדנת ' + w.name;
+    }
   }
   var agesType = getSetting('גילאים_' + w.audience, '');
+  var agesLine = '';
   if (w.ages && agesType) {
     var agesLabel;
     if (agesType === 'גמיש') {
@@ -673,9 +701,10 @@ function generateWAMessage() {
     }
     agesLine = '. הסדנא מיועדת ' + agesLabel + w.ages;
   }
-  parts.push(dayLine);
+  parts.push(dayLine + agesLine);
+  parts.push('');
 
-  if (w.zoomLink) { parts.push('בקישור: ');parts.push(w.zoomLink); parts.push(''); }
+  if (w.zoomLink) { parts.push(w.zoomLink); parts.push(''); }
 
   if (w.equipment) {
     parts.push(getSetting('שורת_ציוד', 'לקראת הסדנה, יש להכין:'));
@@ -1168,6 +1197,83 @@ function exportScheduleImage() {
   } else {
     showToast('לייצוא תמונה — השתמש ב-Ctrl+P ← שמור כ-PDF');
   }
+}
+
+
+var currentMsgType = 'early';
+
+function setMsgType(type, btn) {
+  currentMsgType = type;
+  document.querySelectorAll('#view-wa .filter-btn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  generateWAMessage();
+}
+
+
+function openWAForWorkshop(id) {
+  showView('wa', document.querySelector('[onclick*="showView(\'wa\'"]'));
+  // מצא את הכפתור הנכון בנאב
+  document.querySelectorAll('nav button').forEach(function(btn) {
+    if (btn.textContent.trim() === 'הודעות ווטסאפ') {
+      showView('wa', btn);
+    }
+  });
+  setTimeout(function() {
+    var sel = document.getElementById('wa-select');
+    if (sel) {
+      sel.value = id;
+      onWorkshopSelect();
+    }
+  }, 100);
+}
+
+function renderDaily() {
+  var container = document.getElementById('daily-container');
+  var today = new Date(); today.setHours(0,0,0,0);
+  var todayWs = workshops.filter(function(w) {
+    if (!w.date) return false;
+    var d = parseDate(w.date);
+    return d && d.getTime() === today.getTime();
+  });
+  todayWs.sort(function(a,b){ return (a.start||'').localeCompare(b.start||''); });
+
+  if (todayWs.length === 0) {
+    container.innerHTML = '<div class="empty"><div class="empty-icon">📅</div><div>אין סדנאות היום</div></div>';
+    return;
+  }
+
+  var AUDIENCE_COLORS_MAP = { 'ילדים':'#4fd18a','נוער':'#4f8ef7','אזרחים ותיקים':'#f7c94f','אקו':'#b07ef7','ערבית':'#f7774f' };
+  var html = '';
+
+  todayWs.forEach(function(w) {
+    var color = AUDIENCE_COLORS_MAP[w.audience] || '#4f8ef7';
+    var alerts = [];
+    if (!w.zoomLink) alerts.push('⚠️ חסר קישור זום');
+    if (!w.tech) alerts.push('⚠️ חסר איש טכני');
+
+    html += '<div class="workshop-card" style="border-right: 4px solid ' + color + ';margin-bottom:16px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">' +
+        '<div>' +
+          '<div style="font-size:17px;font-weight:800">' + w.name + '</div>' +
+          '<div style="font-size:13px;color:' + color + ';margin-top:4px">' + (w.audience||'') + (w.ages ? ' · ' + w.ages : '') + '</div>' +
+        '</div>' +
+        '<div style="font-size:15px;font-weight:700;color:var(--accent)">' + (w.start||'') + '–' + (w.end||'') + '</div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px">' +
+        '<div><span style="color:var(--text-muted)">חשבון זום: </span>' + (w.zoomAcc||'—') + '</div>' +
+        '<div><span style="color:var(--text-muted)">קהל יעד: </span>' + (w.audience||'—') + '</div>' +
+        '<div><span style="color:var(--text-muted)">מנחה: </span>' + (w.host||'—') + (w.hostPhone ? ' · ' + w.hostPhone : '') + '</div>' +
+        '<div><span style="color:var(--text-muted)">טכני: </span>' + (w.tech||'—') + (w.techPhone ? ' · ' + w.techPhone : '') + '</div>' +
+      '</div>' +
+      '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">' +
+        (w.zoomLink ? '<a href="' + w.zoomLink + '" target="_blank" class="btn-wa" style="font-size:13px;padding:7px 14px;display:inline-flex">🔗 קישור זום</a>' : '') +
+        '<button onclick="openWAForWorkshop(' + JSON.stringify(w.id) + ')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:Heebo,sans-serif;font-size:13px;padding:7px 14px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:6px">💬 שלח הודעה</button>' +
+      '</div>' +
+      (alerts.length > 0 ? '<div style="margin-top:10px;padding:8px 12px;background:rgba(247,119,79,0.1);border-radius:8px;font-size:13px">' + alerts.join(' &nbsp; ') + '</div>' : '') +
+    '</div>';
+  });
+
+  container.innerHTML = html;
 }
 
 function showToast(msg) {
