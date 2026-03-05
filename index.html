@@ -403,7 +403,7 @@ function loadFromSheet() {
   fetch(url)
     .then(function(r) { return r.text(); })
     .then(function(text) {
-      var json = text.replace(/^\/\*[^*]*\*\/\s*/, '').replace(/^[\s\S]*?\(/, '').replace(/\);?\s*$/, '');
+      var json = text.substring(text.indexOf('(') + 1, text.lastIndexOf(')'));?\s*$/, '');
       var data = JSON.parse(json);
       handleSheetData(data);
     })
@@ -589,7 +589,7 @@ function loadWAGroups() {
   fetch(url)
     .then(function(r) { return r.text(); })
     .then(function(text) {
-      var json = text.replace(/^\/\*[^*]*\*\/\s*/, '').replace(/^[\s\S]*?\(/, '').replace(/\);?\s*$/, '');
+      var json = text.substring(text.indexOf('(') + 1, text.lastIndexOf(')'));?\s*$/, '');
       var data = JSON.parse(json);
       var headers = [];
       if (data.table.cols) data.table.cols.forEach(function(c) { headers.push(c && c.label ? c.label.trim() : ''); });
@@ -770,7 +770,7 @@ function renderZoomView() {
   fetch(url)
     .then(function(r) { return r.text(); })
     .then(function(text) {
-      var json = text.replace(/^\/\*[^*]*\*\/\s*/, '').replace(/^[\s\S]*?\(/, '').replace(/\);?\s*$/, '');
+      var json = text.substring(text.indexOf('(') + 1, text.lastIndexOf(')'));?\s*$/, '');
       var data = JSON.parse(json);
 
       var headers = [];
@@ -844,7 +844,7 @@ function loadInstructors() {
   fetch(url)
     .then(function(r) { return r.text(); })
     .then(function(text) {
-      var json = text.replace(/^\/\*[^*]*\*\/\s*/, '').replace(/^[\s\S]*?\(/, '').replace(/\);?\s*$/, '');
+      var json = text.substring(text.indexOf('(') + 1, text.lastIndexOf(')'));?\s*$/, '');
       var data = JSON.parse(json);
       handleInstructorsData(data);
     })
@@ -984,7 +984,7 @@ function loadWAGroupsCache() {
   fetch(url)
     .then(function(r) { return r.text(); })
     .then(function(text) {
-      var json = text.replace(/^\/\*[^*]*\*\/\s*/, '').replace(/^[\s\S]*?\(/, '').replace(/\);?\s*$/, '');
+      var json = text.substring(text.indexOf('(') + 1, text.lastIndexOf(')'));?\s*$/, '');
       var data = JSON.parse(json);
       var headers = [];
       if (data.table.cols) data.table.cols.forEach(function(c) { headers.push(c && c.label ? c.label.trim() : ''); });
@@ -1018,7 +1018,7 @@ function loadMsgSettings() {
   fetch(url)
     .then(function(r) { return r.text(); })
     .then(function(text) {
-      var json = text.replace(/^\/\*[^*]*\*\/\s*/, '').replace(/^[\s\S]*?\(/, '').replace(/\);?\s*$/, '');
+      var json = text.substring(text.indexOf('(') + 1, text.lastIndexOf(')'));?\s*$/, '');
       var data = JSON.parse(json);
       var h = [];
       if (data.table.cols) data.table.cols.forEach(function(c) { h.push(c && c.label ? c.label.trim() : ''); });
