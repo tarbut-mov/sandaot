@@ -662,7 +662,6 @@ function generateWAMessage() {
     dayLine = 'ביום ' + (w.day ? w.day + ' ' : '') + (w.dateStr ? '(' + w.dateStr + ') ' : '') + timeStr + ' ניפגש לסדנת ' + w.name;
   }
   var agesType = getSetting('גילאים_' + w.audience, '');
-  var agesLine = '';
   if (w.ages && agesType) {
     var agesLabel;
     if (agesType === 'גמיש') {
@@ -674,7 +673,7 @@ function generateWAMessage() {
     }
     agesLine = '. הסדנא מיועדת ' + agesLabel + w.ages;
   }
-  parts.push(dayLine + agesLine);
+  parts.push(dayLine);
 
   if (w.zoomLink) { parts.push('בקישור: ');parts.push(w.zoomLink); parts.push(''); }
 
