@@ -226,11 +226,11 @@
     <div class="page-title">הודעות ווטסאפ</div>
     <div class="wa-section">
       <div class="wa-title">סוג הודעה</div>
-      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-        <button id="msg-type-early" class="filter-btn active" onclick="setMsgType('early',this)">הודעה מקדימה</button>
-        <button id="msg-type-30" class="filter-btn" onclick="setMsgType('30',this)">חצי שעה לפני</button>
-        <button id="msg-type-now" class="filter-btn" onclick="setMsgType('now',this)">בתחילת הסדנא</button>
-      </div>
+      <select id="msg-type-select" class="form-select" onchange="setMsgType(this.value)" style="width:100%;margin-bottom:16px">
+        <option value="early">הודעה מקדימה</option>
+        <option value="30">חצי שעה לפני</option>
+        <option value="now">בתחילת הסדנא</option>
+      </select>
       <div class="wa-title">בחר סדנה</div>
       <select class="form-select" id="wa-select" onchange="onWorkshopSelect()" style="width:100%">
         <option value="">— בחר סדנה —</option>
@@ -1202,29 +1202,36 @@ function exportScheduleImage() {
 
 var currentMsgType = 'early';
 
-function setMsgType(type, btn) {
+function setMsgType(type) {
   currentMsgType = type;
-  document.querySelectorAll('#view-wa .filter-btn').forEach(function(b) { b.classList.remove('active'); });
-  btn.classList.add('active');
   generateWAMessage();
 }
 
 
 function openWAForWorkshop(id) {
-  showView('wa', document.querySelector('[onclick*="showView(\'wa\'"]'));
-  // מצא את הכפתור הנכון בנאב
-  document.querySelectorAll('nav button').forEach(function(btn) {
-    if (btn.textContent.trim() === 'הודעות ווטסאפ') {
-      showView('wa', btn);
-    }
+  var navBtns = document.querySelectorAll('nav button');
+  var waBtn = null;
+  navBtns.forEach(function(btn) {
+    if (btn.getAttribute('onclick') && btn.getAttribute('onclick').indexOf("'wa'") !== -1) waBtn = btn;
   });
+  if (waBtn) showView('wa', waBtn);
   setTimeout(function() {
     var sel = document.getElementById('wa-select');
     if (sel) {
+      // אם הסדנה לא ברשימה — הוסף אותה
+      if (!sel.querySelector('option[value="' + id + '"]')) {
+        var w = workshops.find(function(x){ return x.id === id; });
+        if (w) {
+          var opt = document.createElement('option');
+          opt.value = w.id;
+          opt.textContent = (w.dateStr||'') + ' · ' + (w.start||'') + ' — ' + w.name;
+          sel.appendChild(opt);
+        }
+      }
       sel.value = id;
       onWorkshopSelect();
     }
-  }, 100);
+  }, 150);
 }
 
 function renderDaily() {
