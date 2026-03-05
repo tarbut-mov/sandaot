@@ -652,7 +652,7 @@ function generateWAMessage() {
 
   var greeting = getSetting('פתיחה_' + w.audience, AUDIENCE_GREETING[w.audience] || 'שלום,');
   var parts = [];
-  if (greeting) { parts.push(greeting); parts.push(''); }
+  if (greeting) { parts.push(greeting); }
 
   var timeStr = w.start ? 'בשעה ' + w.start : '';
   var dayLine;
@@ -675,7 +675,6 @@ function generateWAMessage() {
     agesLine = '. הסדנא מיועדת ' + agesLabel + w.ages;
   }
   parts.push(dayLine + agesLine);
-  parts.push('');
 
   if (w.zoomLink) { parts.push('בקישור: ');parts.push(w.zoomLink); parts.push(''); }
 
