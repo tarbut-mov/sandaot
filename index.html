@@ -272,7 +272,7 @@
       <span class="sync-status" id="instr-sync-status"></span>
     </div>
     <div class="notice">
-      נתונים מתוך <a href="https://docs.google.com/spreadsheets/d/1Alx8bVriD2AB19cW75Wq5YAMO8tanLIJvvX8qe_X-w8/edit" target="_blank">שיט תגובות הפורמז</a>. לחץ על מנחה לפרטים מלאים.
+      נתונים מתוך <a href="https://docs.google.com/spreadsheets/d/1A6EPgnd0cax-KDjGtV1D1mXnhNE1mie1FCJLljybEgI/edit?gid=1372414241#gid=1372414241" target="_blank">שיט תגובות הפורמז</a>. לחץ על מנחה לפרטים מלאים.
     </div>
     <div id="instructors-loading" class="loading-bar" style="display:none"><div class="spinner"></div>טוען מנחים...</div>
     <div class="instructors-grid" id="instructors-grid"></div>
@@ -297,7 +297,7 @@
 // =============================================
 var SHEET_ID = '1A6EPgnd0cax-KDjGtV1D1mXnhNE1mie1FCJLljybEgI';
 var SHEET_NAME = 'סדנאות'; // שם הטאב בשיט
-var INSTRUCTORS_SHEET_ID = 'תגובות טופס מנחים';
+var INSTRUCTORS_SHEET_NAME = 'תגובות טופס מנחים';
 var WA_GROUPS_SHEET_NAME = 'קישורים לקבוצות ווטסאפ';
 var ZOOM_SHEET_NAME = 'חשבונות זום';
 var SETTINGS_SHEET_NAME = 'פורמט הודעה';
@@ -794,7 +794,7 @@ function loadInstructors() {
   statusEl.textContent = 'טוען...';
   if (loadingEl) loadingEl.style.display = 'flex';
 
-  var url = 'https://docs.google.com/spreadsheets/d/' + INSTRUCTORS_SHEET_ID + '/gviz/tq?tqx=out:json&t=' + Date.now();
+  var url = 'https://docs.google.com/spreadsheets/d/' + INSTRUCTORS_SHEET_NAME + '/gviz/tq?tqx=out:json&t=' + Date.now();
   fetch(url)
     .then(function(r) { return r.text(); })
     .then(function(text) {
