@@ -211,6 +211,7 @@
       ולחץ "רענן נתונים" כדי לראות את השינויים כאן.
     </div>
     <div class="stats" id="stats-row"></div>
+    <div id="workshops-date-filter"></div>
     <div class="section-header">
       <div class="filters" id="filters-row"></div>
     </div>
@@ -231,6 +232,7 @@
         <button id="msg-type-30" class="filter-btn" onclick="setMsgType('30',this)">חצי שעה לפני</button>
         <button id="msg-type-now" class="filter-btn" onclick="setMsgType('now',this)">בתחילת הסדנא</button>
       </div>
+      <div id="wa-date-filter"></div>
       <div class="wa-title">בחר סדנה</div>
       <select class="form-select" id="wa-select" onchange="onWorkshopSelect()" style="width:100%">
         <option value="">— בחר סדנה —</option>
@@ -258,6 +260,7 @@
   <!-- ZOOM VIEW -->
   <div class="view" id="view-zoom">
     <div class="page-title">ניהול חשבונות זום</div>
+    <div id="zoom-date-filter"></div>
     <div style="margin-bottom:16px"><label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);cursor:pointer"><input type="checkbox" id="zoom-show-past" onchange="renderZoomView()" style="accent-color:var(--accent)"> הצג זומים שכבר היו</label></div>
     <div class="zoom-grid" id="zoom-grid"></div>
   </div>
@@ -324,6 +327,7 @@ var SETTINGS_SHEET_NAME = 'פורמט הודעה';
 var workshops = [];
 var instructors = [];
 var waGroupsCache = [];
+var activeDateFilter = [];
 var msgSettings = {};
 var currentFilter = 'all';
 
@@ -493,6 +497,7 @@ function showView(name, btn) {
 }
 
 function renderWorkshops() {
+  buildDateFilterWidget('workshops-date-filter', 'renderWorkshops');
   var today = new Date(); today.setHours(0,0,0,0);
   var showAll = document.getElementById('show-all-dates') && document.getElementById('show-all-dates').checked;
   var baseList = showAll ? workshops : workshops.filter(function(w) {
@@ -501,6 +506,7 @@ function renderWorkshops() {
     return !d || d >= today;
   });
   var filtered = currentFilter === 'all' ? baseList : baseList.filter(function(w) { return w.audience === currentFilter; });
+  filtered = filtered.filter(function(w) { return isDateVisible(w.dateStr); });
   filtered.sort(function(a, b) {
     var da = parseDate(a.date), db = parseDate(b.date);
     if (!da && !db) return 0; if (!da) return 1; if (!db) return -1;
@@ -624,11 +630,13 @@ function loadWAGroups() {
 }
 
 function renderWAView() {
+  buildDateFilterWidget('wa-date-filter', 'renderWAView');
   var sel = document.getElementById('wa-select');
   sel.innerHTML = '<option value="">— בחר סדנה —</option>';
   var todayWA = new Date(); todayWA.setHours(0,0,0,0);
   workshops.forEach(function(w) {
     if (w.date) { var dWA = parseDate(w.date); if (dWA && dWA < todayWA) return; }
+    if (!isDateVisible(w.dateStr)) return;
     sel.innerHTML += '<option value="' + w.id + '">' + w.name + ' | יום ' + (w.day||'?') + ' ' + (w.start||'') + '</option>';
   });
   // טען קישורים מהטאב הייעודי
@@ -753,6 +761,7 @@ function copyMessage() {
 // ZOOM
 // =============================================
 function renderZoomView() {
+  buildDateFilterWidget('zoom-date-filter', 'renderZoomView');
   var grid = document.getElementById('zoom-grid');
   grid.innerHTML = '<div class="loading-bar"><div class="spinner"></div>טוען חשבונות זום...</div>';
 
@@ -794,6 +803,7 @@ function renderZoomView() {
         var accWs = workshops.filter(function(w) {
           if (w.zoomAcc !== acc.name) return false;
           if (!showPast && w.date) { var d = parseDate(w.date); if (d && d < todayZoom) return false; }
+          if (!isDateVisible(w.dateStr)) return false;
           return true;
         });
         var slots = '';
@@ -1274,6 +1284,73 @@ function renderDaily() {
   });
 
   container.innerHTML = html;
+}
+
+
+function isDateVisible(dateStr) {
+  if (activeDateFilter.length === 0) return true;
+  return activeDateFilter.indexOf(dateStr) !== -1;
+}
+
+function buildDateFilterWidget(containerId, callbackName) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  var dates = [];
+  workshops.forEach(function(w) {
+    if (w.dateStr && dates.indexOf(w.dateStr) === -1) dates.push(w.dateStr);
+  });
+  dates.sort(function(a, b) {
+    var pa = a.split('/'), pb = b.split('/');
+    var da = new Date(parseInt(pa[2]), parseInt(pa[1])-1, parseInt(pa[0]));
+    var db = new Date(parseInt(pb[2]), parseInt(pb[1])-1, parseInt(pb[0]));
+    return da - db;
+  });
+  container.innerHTML = '';
+  if (dates.length === 0) return;
+
+  var wrapper = document.createElement('div');
+  wrapper.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;align-items:center';
+
+  var label = document.createElement('span');
+  label.style.cssText = 'font-size:12px;color:var(--text-muted)';
+  label.textContent = 'סנן לפי תאריך:';
+  wrapper.appendChild(label);
+
+  dates.forEach(function(d) {
+    var isActive = activeDateFilter.length === 0 || activeDateFilter.indexOf(d) !== -1;
+    var btn = document.createElement('button');
+    btn.textContent = d;
+    btn.style.cssText = 'font-size:12px;padding:4px 10px;border-radius:16px;cursor:pointer;border:1px solid ' +
+      (isActive ? 'var(--accent)' : 'var(--border)') + ';background:' +
+      (isActive ? 'var(--accent)' : 'var(--surface2)') + ';color:' +
+      (isActive ? 'white' : 'var(--text-muted)') + ';font-family:Heebo,sans-serif';
+    btn.onclick = (function(date) {
+      return function() {
+        if (activeDateFilter.length === 0) {
+          activeDateFilter = dates.filter(function(x) { return x !== date; });
+        } else {
+          var idx = activeDateFilter.indexOf(date);
+          if (idx !== -1) activeDateFilter.splice(idx, 1);
+          else activeDateFilter.push(date);
+          if (activeDateFilter.length === dates.length) activeDateFilter = [];
+        }
+        buildDateFilterWidget(containerId, callbackName);
+        window[callbackName]();
+      };
+    })(d);
+    wrapper.appendChild(btn);
+  });
+
+  var clearBtn = document.createElement('button');
+  clearBtn.textContent = 'הכל ✕';
+  clearBtn.style.cssText = 'font-size:11px;color:var(--text-muted);background:none;border:none;cursor:pointer;padding:4px 8px;font-family:Heebo,sans-serif';
+  clearBtn.onclick = function() {
+    activeDateFilter = [];
+    buildDateFilterWidget(containerId, callbackName);
+    window[callbackName]();
+  };
+  wrapper.appendChild(clearBtn);
+  container.appendChild(wrapper);
 }
 
 function showToast(msg) {
