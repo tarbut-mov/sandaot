@@ -1151,6 +1151,7 @@ function getCurrentWeekKey() {
 }
 
 function isDateVisible(dateStr) {
+  if (activeWeekKeys === 'all') return true;
   var keys = activeWeekKeys === null ? [getCurrentWeekKey()] : activeWeekKeys;
   return keys.indexOf(getWeekKey(dateStr)) !== -1;
 }
@@ -1170,10 +1171,15 @@ function buildDateFilterWidget(containerId, callbackName) {
   var thisWeek = getCurrentWeekKey();
   if (activeWeekKeys === null) activeWeekKeys = [thisWeek];
 
-  var selectedCount = activeWeekKeys.length;
-  var label = selectedCount === 1
-    ? (activeWeekKeys[0] === thisWeek ? 'השבוע הנוכחי' : 'שבוע ' + getWeekLabel(activeWeekKeys[0])) + ' ▾'
-    : selectedCount + ' שבועות ▾';
+  var label;
+  if (activeWeekKeys === 'all') {
+    label = 'כל הזמנים ▾';
+  } else {
+    var selectedCount = activeWeekKeys.length;
+    label = selectedCount === 1
+      ? (activeWeekKeys[0] === thisWeek ? 'השבוע הנוכחי' : 'שבוע ' + getWeekLabel(activeWeekKeys[0])) + ' ▾'
+      : selectedCount + ' שבועות ▾';
+  }
 
   container.innerHTML = '';
   var wrapper = document.createElement('div');
@@ -1192,8 +1198,28 @@ function buildDateFilterWidget(containerId, callbackName) {
   };
   document.addEventListener('click', function() { dropdown.style.display = 'none'; });
 
+  // "כל הזמנים" option
+  var allTimeRow = document.createElement('div');
+  var isAllTime = activeWeekKeys === 'all';
+  allTimeRow.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:13px;color:' + (isAllTime ? 'var(--accent)' : 'var(--text)') + ';border-bottom:1px solid var(--border);margin-bottom:4px';
+  allTimeRow.innerHTML = '<span style="width:16px;text-align:center;color:var(--accent)">' + (isAllTime ? '✓' : '') + '</span><span>כל הזמנים</span>';
+  allTimeRow.onmouseover = function(){ this.style.background='var(--surface2)'; };
+  allTimeRow.onmouseout = function(){ this.style.background=''; };
+  allTimeRow.onclick = function(e) {
+    e.stopPropagation();
+    activeWeekKeys = 'all';
+    ['workshops-date-filter','wa-date-filter','zoom-date-filter','schedule-week-filter'].forEach(function(id) {
+      buildDateFilterWidget(id, callbackName);
+    });
+    if (document.getElementById('view-workshops').classList.contains('active')) renderWorkshops();
+    if (document.getElementById('view-whatsapp').classList.contains('active')) renderWAView();
+    if (document.getElementById('view-zoom').classList.contains('active')) renderZoomView();
+    if (document.getElementById('view-schedule').classList.contains('active')) renderSchedule();
+  };
+  dropdown.appendChild(allTimeRow);
+
   weekKeys.forEach(function(k) {
-    var isActive = activeWeekKeys.indexOf(k) !== -1;
+    var isActive = activeWeekKeys !== 'all' && activeWeekKeys.indexOf(k) !== -1;
     var row = document.createElement('div');
     row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:13px;color:' + (isActive ? 'var(--accent)' : 'var(--text)');
     var lbl = k === thisWeek ? 'השבוע הנוכחי (' + getWeekLabel(k) + ')' : 'שבוע ' + getWeekLabel(k);
@@ -1203,11 +1229,14 @@ function buildDateFilterWidget(containerId, callbackName) {
     row.onclick = (function(key) {
       return function(e) {
         e.stopPropagation();
-        var idx = activeWeekKeys.indexOf(key);
-        if (idx !== -1) {
-          if (activeWeekKeys.length > 1) activeWeekKeys.splice(idx, 1);
-        } else {
-          activeWeekKeys.push(key);
+        if (activeWeekKeys === 'all') activeWeekKeys = [key];
+        else {
+          var idx = activeWeekKeys.indexOf(key);
+          if (idx !== -1) {
+            if (activeWeekKeys.length > 1) activeWeekKeys.splice(idx, 1);
+          } else {
+            activeWeekKeys.push(key);
+          }
         }
         // sync all widgets
         ['workshops-date-filter','wa-date-filter','zoom-date-filter','schedule-week-filter'].forEach(function(id) {
