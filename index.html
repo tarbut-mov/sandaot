@@ -276,6 +276,7 @@
       <button class="btn-primary" onclick="exportScheduleExcel()">⬇️ ייצא Excel</button>
       <button class="btn-primary" style="background:var(--surface2);border:1px solid var(--border);color:var(--text)" onclick="exportScheduleImage()">🖼️ ייצא תמונה</button>
     </div>
+    <div id="schedule-week-filter"></div>
     <div id="schedule-container" style="overflow-x:auto"></div>
   </div>
 
@@ -313,7 +314,7 @@ var instructors = [];
 var waGroupsCache = [];
 var msgSettings = {};
 var currentFilter = 'all';
-var activeWeekKey = null; // null = השבוע הנוכחי
+var activeWeekKeys = null; // null = השבוע הנוכחי
 
 var AUDIENCE_COLORS = {
   'ילדים': 'badge-green', 'נוער': 'badge-blue',
@@ -879,6 +880,7 @@ function formatAges(ages) {
 
 
 function renderSchedule() {
+  buildDateFilterWidget('schedule-week-filter', 'renderSchedule');
   var DAYS = ['ראשון','שני','שלישי','רביעי','חמישי'];
   var AUDIENCE_COLORS_MAP = {
     'ילדים': '#4fd18a', 'נוער': '#4f8ef7', 'אזרחים ותיקים': '#f7c94f',
@@ -897,6 +899,7 @@ function renderSchedule() {
   var weeks = {}; // key=weekStart.getTime() → {label, days: {dayName → [workshops]}}
   workshops.forEach(function(w) {
     if (!w.date) return;
+    if (!isDateVisible(w.dateStr)) return;
     var d = parseDate(w.date);
     if (!d) return;
     var ws = getWeekStart(d);
@@ -917,20 +920,13 @@ function renderSchedule() {
     return;
   }
 
-  // טאבים
-  var tabsHtml = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">';
-  weekKeys.forEach(function(k, i) {
-    tabsHtml += '<button id="week-tab-' + k + '" onclick="showWeekTab(' + k + ')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);font-family:Heebo,sans-serif;font-size:13px;padding:7px 16px;border-radius:20px;cursor:pointer">' + weeks[k].label + '</button>';
-  });
-  tabsHtml += '</div><div id="week-content"></div>';
-  document.getElementById('schedule-container').innerHTML = tabsHtml;
-
+  document.getElementById('schedule-container').innerHTML = '<div id="week-content"></div>';
   window._scheduleWeeks = weeks;
   window._scheduleDays = DAYS;
   window._scheduleColors = AUDIENCE_COLORS_MAP;
-
-  // הצג שבוע ראשון
-  showWeekTab(weekKeys[0]);
+  // הצג את כל השבועות הנבחרים
+  var allKeys = Object.keys(weeks).map(Number).sort(function(a,b){return a-b;});
+  if (allKeys.length > 0) showWeekTab(allKeys[0]);
 }
 
 function showWeekTab(key) {
@@ -1135,47 +1131,47 @@ function getWeekLabel(key) {
   return start.getDate() + '/' + (start.getMonth()+1) + ' – ' + end.getDate() + '/' + (end.getMonth()+1);
 }
 
+function getCurrentWeekKey() {
+  var today = new Date(); today.setHours(0,0,0,0);
+  today.setDate(today.getDate() - today.getDay());
+  return today.getTime();
+}
+
 function isDateVisible(dateStr) {
-  if (activeWeekKey === null) {
-    // השבוע הנוכחי
-    var today = new Date(); today.setHours(0,0,0,0);
-    var day = today.getDay();
-    today.setDate(today.getDate() - day);
-    return getWeekKey(dateStr) === today.getTime();
-  }
-  return getWeekKey(dateStr) === activeWeekKey;
+  var keys = activeWeekKeys === null ? [getCurrentWeekKey()] : activeWeekKeys;
+  return keys.indexOf(getWeekKey(dateStr)) !== -1;
 }
 
 function buildDateFilterWidget(containerId, callbackName) {
   var container = document.getElementById(containerId);
   if (!container) return;
 
-  // אסוף שבועות ייחודיים
   var weekKeys = [];
   workshops.forEach(function(w) {
     var k = getWeekKey(w.dateStr);
     if (k !== null && weekKeys.indexOf(k) === -1) weekKeys.push(k);
   });
-  weekKeys.sort(function(a,b){ return b-a; }); // יורד — קרוב יותר למעלה
+  weekKeys.sort(function(a,b){ return b-a; });
+  if (weekKeys.length === 0) { container.innerHTML = ''; return; }
+
+  var thisWeek = getCurrentWeekKey();
+  if (activeWeekKeys === null) activeWeekKeys = [thisWeek];
+
+  var selectedCount = activeWeekKeys.length;
+  var label = selectedCount === 1
+    ? (activeWeekKeys[0] === thisWeek ? 'השבוע הנוכחי' : 'שבוע ' + getWeekLabel(activeWeekKeys[0])) + ' ▾'
+    : selectedCount + ' שבועות ▾';
 
   container.innerHTML = '';
-  if (weekKeys.length === 0) return;
-
-  // קבע activeWeekKey לשבוע הנוכחי אם לא הוגדר
-  var today = new Date(); today.setHours(0,0,0,0);
-  var day = today.getDay(); today.setDate(today.getDate() - day);
-  var thisWeek = today.getTime();
-  if (activeWeekKey === null) activeWeekKey = thisWeek;
-
   var wrapper = document.createElement('div');
   wrapper.style.cssText = 'position:relative;display:inline-block;margin-bottom:16px';
 
   var toggleBtn = document.createElement('button');
-  toggleBtn.textContent = 'שבוע ' + getWeekLabel(activeWeekKey) + ' ▾';
+  toggleBtn.textContent = label;
   toggleBtn.style.cssText = 'background:var(--surface2);border:1px solid var(--accent);color:var(--accent);font-family:Heebo,sans-serif;font-size:13px;padding:7px 16px;border-radius:20px;cursor:pointer';
 
   var dropdown = document.createElement('div');
-  dropdown.style.cssText = 'display:none;position:absolute;top:calc(100% + 6px);right:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px;z-index:100;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,0.4)';
+  dropdown.style.cssText = 'display:none;position:absolute;top:calc(100% + 6px);right:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px;z-index:100;min-width:220px;box-shadow:0 8px 24px rgba(0,0,0,0.4)';
 
   toggleBtn.onclick = function(e) {
     e.stopPropagation();
@@ -1184,22 +1180,32 @@ function buildDateFilterWidget(containerId, callbackName) {
   document.addEventListener('click', function() { dropdown.style.display = 'none'; });
 
   weekKeys.forEach(function(k) {
-    var isActive = k === activeWeekKey;
+    var isActive = activeWeekKeys.indexOf(k) !== -1;
     var row = document.createElement('div');
     row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:13px;color:' + (isActive ? 'var(--accent)' : 'var(--text)');
-    if (k === thisWeek) {
-      row.innerHTML = '<span style="width:16px;text-align:center;color:var(--accent)">' + (isActive ? '✓' : '') + '</span><span>השבוע הנוכחי (' + getWeekLabel(k) + ')</span>';
-    } else {
-      row.innerHTML = '<span style="width:16px;text-align:center;color:var(--accent)">' + (isActive ? '✓' : '') + '</span><span>שבוע ' + getWeekLabel(k) + '</span>';
-    }
+    var lbl = k === thisWeek ? 'השבוע הנוכחי (' + getWeekLabel(k) + ')' : 'שבוע ' + getWeekLabel(k);
+    row.innerHTML = '<span style="width:16px;text-align:center;color:var(--accent)">' + (isActive ? '✓' : '') + '</span><span>' + lbl + '</span>';
     row.onmouseover = function(){ this.style.background='var(--surface2)'; };
     row.onmouseout = function(){ this.style.background=''; };
     row.onclick = (function(key) {
       return function(e) {
         e.stopPropagation();
-        activeWeekKey = key;
+        var idx = activeWeekKeys.indexOf(key);
+        if (idx !== -1) {
+          if (activeWeekKeys.length > 1) activeWeekKeys.splice(idx, 1);
+        } else {
+          activeWeekKeys.push(key);
+        }
+        // sync all widgets
+        ['workshops-date-filter','wa-date-filter','zoom-date-filter','schedule-week-filter'].forEach(function(id) {
+          if (id !== containerId) buildDateFilterWidget(id, callbackName);
+        });
         buildDateFilterWidget(containerId, callbackName);
-        window[callbackName]();
+        // refresh all active views
+        if (document.getElementById('view-workshops').classList.contains('active')) renderWorkshops();
+        if (document.getElementById('view-whatsapp').classList.contains('active')) renderWAView();
+        if (document.getElementById('view-zoom').classList.contains('active')) renderZoomView();
+        if (document.getElementById('view-schedule').classList.contains('active')) renderSchedule();
       };
     })(k);
     dropdown.appendChild(row);
