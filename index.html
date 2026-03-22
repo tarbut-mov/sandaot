@@ -211,6 +211,7 @@
       ולחץ "רענן נתונים" כדי לראות את השינויים כאן.
     </div>
     <div class="stats" id="stats-row"></div>
+    <div id="workshops-date-filter"></div>
     <div class="section-header">
       <div class="filters" id="filters-row"></div>
     </div>
@@ -231,6 +232,7 @@
         <button id="msg-type-30" class="filter-btn" onclick="setMsgType('30',this)">חצי שעה לפני</button>
         <button id="msg-type-now" class="filter-btn" onclick="setMsgType('now',this)">בתחילת הסדנא</button>
       </div>
+      <div id="wa-date-filter"></div>
       <div class="wa-title">בחר סדנה</div>
       <select class="form-select" id="wa-select" onchange="onWorkshopSelect()" style="width:100%">
         <option value="">— בחר סדנה —</option>
@@ -258,6 +260,7 @@
   <!-- ZOOM VIEW -->
   <div class="view" id="view-zoom">
     <div class="page-title">ניהול חשבונות זום</div>
+    <div id="zoom-date-filter"></div>
     <div style="margin-bottom:16px"><label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);cursor:pointer"><input type="checkbox" id="zoom-show-past" onchange="renderZoomView()" style="accent-color:var(--accent)"> הצג זומים שכבר היו</label></div>
     <div class="zoom-grid" id="zoom-grid"></div>
   </div>
@@ -326,6 +329,7 @@ var instructors = [];
 var waGroupsCache = [];
 var msgSettings = {};
 var currentFilter = 'all';
+var activeDateFilter = [];
 
 var AUDIENCE_COLORS = {
   'ילדים': 'badge-green', 'נוער': 'badge-blue',
@@ -494,6 +498,7 @@ function showView(name, btn) {
 }
 
 function renderWorkshops() {
+  buildDateFilterWidget('workshops-date-filter', 'renderWorkshops');
   var today = new Date(); today.setHours(0,0,0,0);
   var showAll = document.getElementById('show-all-dates') && document.getElementById('show-all-dates').checked;
   var baseList = showAll ? workshops : workshops.filter(function(w) {
@@ -502,6 +507,7 @@ function renderWorkshops() {
     return !d || d >= today;
   });
   var filtered = currentFilter === 'all' ? baseList : baseList.filter(function(w) { return w.audience === currentFilter; });
+  filtered = filtered.filter(function(w) { return isDateVisible(w.dateStr); });
   filtered.sort(function(a, b) {
     var da = parseDate(a.date), db = parseDate(b.date);
     if (!da && !db) return 0; if (!da) return 1; if (!db) return -1;
@@ -625,11 +631,13 @@ function loadWAGroups() {
 }
 
 function renderWAView() {
+  buildDateFilterWidget('wa-date-filter', 'renderWAView');
   var sel = document.getElementById('wa-select');
   sel.innerHTML = '<option value="">— בחר סדנה —</option>';
   var todayWA = new Date(); todayWA.setHours(0,0,0,0);
   workshops.forEach(function(w) {
     if (w.date) { var dWA = parseDate(w.date); if (dWA && dWA < todayWA) return; }
+    if (!isDateVisible(w.dateStr)) return;
     sel.innerHTML += '<option value="' + w.id + '">' + w.name + ' | יום ' + (w.day||'?') + ' ' + (w.start||'') + '</option>';
   });
   // טען קישורים מהטאב הייעודי
@@ -754,6 +762,7 @@ function copyMessage() {
 // ZOOM
 // =============================================
 function renderZoomView() {
+  buildDateFilterWidget('zoom-date-filter', 'renderZoomView');
   var grid = document.getElementById('zoom-grid');
   grid.innerHTML = '<div class="loading-bar"><div class="spinner"></div>טוען חשבונות זום...</div>';
 
@@ -795,6 +804,7 @@ function renderZoomView() {
         var accWs = workshops.filter(function(w) {
           if (w.zoomAcc !== acc.name) return false;
           if (!showPast && w.date) { var d = parseDate(w.date); if (d && d < todayZoom) return false; }
+          if (!isDateVisible(w.dateStr)) return false;
           return true;
         });
         var slots = '';
@@ -1275,6 +1285,96 @@ function renderDaily() {
   });
 
   container.innerHTML = html;
+}
+
+
+function isDateVisible(dateStr) {
+  if (activeDateFilter.length === 0) return true;
+  return activeDateFilter.indexOf(dateStr) !== -1;
+}
+
+function buildDateFilterWidget(containerId, callbackName) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  var dates = [];
+  workshops.forEach(function(w) {
+    if (w.dateStr && dates.indexOf(w.dateStr) === -1) dates.push(w.dateStr);
+  });
+  dates.sort(function(a, b) {
+    var pa = a.split('/'), pb = b.split('/');
+    var da = new Date(parseInt(pa[2]), parseInt(pa[1])-1, parseInt(pa[0]));
+    var db = new Date(parseInt(pb[2]), parseInt(pb[1])-1, parseInt(pb[0]));
+    return da - db;
+  });
+  container.innerHTML = '';
+  if (dates.length === 0) return;
+
+  var selectedCount = activeDateFilter.length > 0 ?
+    dates.filter(function(d){ return activeDateFilter.indexOf(d) !== -1; }).length : dates.length;
+  var btnLabel = activeDateFilter.length > 0 ?
+    'סנן תאריך (' + selectedCount + '/' + dates.length + ') ▾' : 'סנן לפי תאריך ▾';
+
+  var wrapper = document.createElement('div');
+  wrapper.style.cssText = 'position:relative;display:inline-block;margin-bottom:16px';
+
+  var toggleBtn = document.createElement('button');
+  toggleBtn.textContent = btnLabel;
+  toggleBtn.style.cssText = 'background:var(--surface2);border:1px solid ' +
+    (activeDateFilter.length > 0 ? 'var(--accent)' : 'var(--border)') + ';color:' +
+    (activeDateFilter.length > 0 ? 'var(--accent)' : 'var(--text-muted)') +
+    ';font-family:Heebo,sans-serif;font-size:13px;padding:7px 16px;border-radius:20px;cursor:pointer';
+
+  var dropdown = document.createElement('div');
+  dropdown.style.cssText = 'display:none;position:absolute;top:calc(100% + 6px);right:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px;z-index:100;min-width:180px;box-shadow:0 8px 24px rgba(0,0,0,0.4)';
+
+  toggleBtn.onclick = function(e) {
+    e.stopPropagation();
+    dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+  };
+  document.addEventListener('click', function() { dropdown.style.display = 'none'; });
+
+  // "הכל"
+  var allRow = document.createElement('div');
+  allRow.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;color:var(--text-muted);font-size:13px;border-bottom:1px solid var(--border);margin-bottom:4px';
+  allRow.innerHTML = '<span style="width:16px;text-align:center;color:var(--accent)">' + (activeDateFilter.length === 0 ? '✓' : '') + '</span><span>הכל</span>';
+  allRow.onmouseover = function(){ this.style.background='var(--surface2)'; };
+  allRow.onmouseout = function(){ this.style.background=''; };
+  allRow.onclick = function(e) {
+    e.stopPropagation();
+    activeDateFilter = [];
+    buildDateFilterWidget(containerId, callbackName);
+    window[callbackName]();
+  };
+  dropdown.appendChild(allRow);
+
+  dates.forEach(function(d) {
+    var isActive = activeDateFilter.length === 0 || activeDateFilter.indexOf(d) !== -1;
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--text)';
+    row.innerHTML = '<span style="width:16px;text-align:center;color:var(--accent)">' + (isActive ? '✓' : '') + '</span><span>' + d + '</span>';
+    row.onmouseover = function(){ this.style.background='var(--surface2)'; };
+    row.onmouseout = function(){ this.style.background=''; };
+    row.onclick = (function(date) {
+      return function(e) {
+        e.stopPropagation();
+        if (activeDateFilter.length === 0) {
+          activeDateFilter = dates.filter(function(x){ return x !== date; });
+        } else {
+          var idx = activeDateFilter.indexOf(date);
+          if (idx !== -1) activeDateFilter.splice(idx, 1);
+          else activeDateFilter.push(date);
+          if (activeDateFilter.length === dates.length) activeDateFilter = [];
+        }
+        buildDateFilterWidget(containerId, callbackName);
+        window[callbackName]();
+      };
+    })(d);
+    dropdown.appendChild(row);
+  });
+
+  wrapper.appendChild(toggleBtn);
+  wrapper.appendChild(dropdown);
+  container.appendChild(wrapper);
 }
 
 function showToast(msg) {
