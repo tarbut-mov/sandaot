@@ -191,7 +191,6 @@
     <button class="active" onclick="showView('workshops',this)">סדנאות</button>
     <button onclick="showView('whatsapp',this)">הודעות ווטסאפ</button>
     <button onclick="showView('zoom',this)">ניהול זום</button>
-    <button onclick="showView('instructors',this)">מנחים</button>
     <button onclick="showView('schedule',this)">מערכת שעות</button>
     <button onclick="showView('daily',this)">יומן היום</button>
   </nav>
@@ -227,11 +226,11 @@
     <div class="page-title">הודעות ווטסאפ</div>
     <div class="wa-section">
       <div class="wa-title">סוג הודעה</div>
-      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-        <button id="msg-type-early" class="filter-btn active" onclick="setMsgType('early',this)">הודעה מקדימה</button>
-        <button id="msg-type-30" class="filter-btn" onclick="setMsgType('30',this)">חצי שעה לפני</button>
-        <button id="msg-type-now" class="filter-btn" onclick="setMsgType('now',this)">בתחילת הסדנא</button>
-      </div>
+      <select id="msg-type-select" class="form-select" onchange="setMsgType(this.value)" style="width:100%;margin-bottom:16px">
+        <option value="early">הודעה מקדימה</option>
+        <option value="30">חצי שעה לפני</option>
+        <option value="now">בתחילת הסדנא</option>
+      </select>
       <div id="wa-date-filter"></div>
       <div class="wa-title">בחר סדנה</div>
       <select class="form-select" id="wa-select" onchange="onWorkshopSelect()" style="width:100%">
@@ -280,20 +279,6 @@
     </div>
     <div id="schedule-container" style="overflow-x:auto"></div>
   </div>
-
-  <!-- INSTRUCTORS VIEW -->
-  <div class="view" id="view-instructors">
-    <div class="instr-sync-row">
-      <button class="btn-sync" onclick="loadInstructors()">&#8635; רענן מנחים</button>
-      <span class="sync-status" id="instr-sync-status"></span>
-    </div>
-    <div class="notice">
-      נתונים מתוך <a href="https://docs.google.com/spreadsheets/d/1A6EPgnd0cax-KDjGtV1D1mXnhNE1mie1FCJLljybEgI/edit?gid=1372414241" target="_blank">שיט תגובות הפורמז</a>. לחץ על מנחה לפרטים מלאים.
-    </div>
-    <div id="instructors-loading" class="loading-bar" style="display:none"><div class="spinner"></div>טוען מנחים...</div>
-    <div class="instructors-grid" id="instructors-grid"></div>
-  </div>
-
 
 </main>
 
@@ -835,149 +820,9 @@ function renderZoomView() {
 // =============================================
 // INSTRUCTORS
 // =============================================
-function loadInstructors() {
-  var statusEl = document.getElementById('instr-sync-status');
-  var loadingEl = document.getElementById('instructors-loading');
-  statusEl.className = 'sync-status';
-  statusEl.textContent = 'טוען...';
-  if (loadingEl) loadingEl.style.display = 'flex';
 
-  var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/gviz/tq?tqx=out:json&headers=1&sheet=' + encodeURIComponent(INSTRUCTORS_SHEET_NAME) + '&t=' + Date.now();
-  fetch(url)
-    .then(function(r) { return r.text(); })
-    .then(function(text) {
-      var json = text.replace(/^\/\*[^*]*\*\/\s*/, '').replace(/^[\s\S]*?\(/, '').replace(/\);?\s*$/, '');
-      var data = JSON.parse(json);
-      handleInstructorsData(data);
-    })
-    .catch(function(err) {
-      statusEl.className = 'sync-status err';
-      statusEl.textContent = 'שגיאה — בדוק שהשיט ציבורי';
-      if (loadingEl) loadingEl.style.display = 'none';
-      console.error(err);
-    });
-}
 
-function handleInstructorsData(data) {
-  var statusEl = document.getElementById('instr-sync-status');
-  var loadingEl = document.getElementById('instructors-loading');
-  if (loadingEl) loadingEl.style.display = 'none';
 
-  try {
-    var rows = data.table.rows;
-    instructors = [];
-
-    // כותרות מגיעות מ-cols (לא משורה ראשונה) ב-gviz API
-    var headers = [];
-    if (data.table.cols) {
-      data.table.cols.forEach(function(col) {
-        headers.push(col && col.label ? String(col.label).trim() : '');
-      });
-    }
-
-    var getIdx = function(name) { return headers.indexOf(name); };
-
-    // gviz API מחזיר כותרות ב-cols, לא כשורה ראשונה — כל השורות הן נתונים
-    rows.forEach(function(row, idx) {
-      if (!row.c) return;
-      var get = function(name) {
-        var i = getIdx(name);
-        return (i >= 0 && row.c[i] && row.c[i].v !== null) ? String(row.c[i].v) : '';
-      };
-      var name = get('שם');
-      if (!name) return;
-      instructors.push({
-        id: String(idx),
-        timestamp:  get('Timestamp'),
-        name:       name,
-        phone:      get('מספר טלפון'),
-        howCame:    get('איך הגעתי להעברת הסדנא?'),
-        topic:      get('כותרת הסדנא'),
-        desc:       get('הסבר קצר על מה קורה בסדנא'),
-        duration:   get('אורך הסדנא'),
-        artField:   get('תחום אמנות בו הסדנא עוסקת'),
-        ages:       get('לאילו גילאים מתאימה הסדנא'),
-        equipment:  get('ציוד נדרש/היערכות מוקדמת'),
-        techNeeds:  get('צרכים טכניים נוספים'),
-        availSun:   get('באילו זמנים אוכל להעביר את הסדנא [יום ראשון]'),
-        availMon:   get('באילו זמנים אוכל להעביר את הסדנא [יום שני]'),
-        availTue:   get('באילו זמנים אוכל להעביר את הסדנא [יום שלישי]'),
-        availWed:   get('באילו זמנים אוכל להעביר את הסדנא [יום רביעי]'),
-        availThu:   get('באילו זמנים אוכל להעביר את הסדנא [יום חמישי]'),
-        availOther: get('זמן אחר'),
-        notes:      get('הערות/בקשות נוספות'),
-        location:   get('מקום מגורים')
-      });
-    });
-
-    statusEl.className = 'sync-status ok';
-    statusEl.textContent = 'עודכן — ' + instructors.length + ' מנחים';
-    renderInstructors();
-  } catch(e) {
-    statusEl.className = 'sync-status err';
-    statusEl.textContent = 'שגיאה בעיבוד הנתונים';
-    console.error(e);
-  }
-}
-
-function renderInstructors() {
-  var grid = document.getElementById('instructors-grid');
-  if (instructors.length === 0) {
-    grid.innerHTML = '<div class="empty"><div class="empty-icon">👤</div><div>אין מנחים עדיין</div></div>';
-    return;
-  }
-
-  var DAYS = [
-    { key: 'availSun', label: 'ראשון' }, { key: 'availMon', label: 'שני' },
-    { key: 'availTue', label: 'שלישי' }, { key: 'availWed', label: 'רביעי' },
-    { key: 'availThu', label: 'חמישי' }, { key: 'availOther', label: 'אחר' }
-  ];
-
-  grid.innerHTML = instructors.map(function(p) {
-    var availDays = DAYS.filter(function(d) { return p[d.key]; });
-
-    var availHTML = availDays.length > 0
-      ? '<div class="avail-grid">' + availDays.map(function(d) {
-          return '<div class="avail-day"><div class="avail-day-name">יום ' + d.label + '</div><div class="avail-times">' + p[d.key] + '</div></div>';
-        }).join('') + '</div>'
-      : '<span style="color:var(--text-muted);font-size:13px">לא צוין</span>';
-
-    var rows = [
-      { label: 'טלפון', value: p.phone ? '<a href="tel:' + p.phone + '" style="color:var(--accent)">' + p.phone + '</a>' : '—' },
-      { label: 'כותרת הסדנא', value: p.topic || '—' },
-      { label: 'תיאור', value: p.desc || '—' },
-      { label: 'תחום אמנות', value: p.artField || '—' },
-      { label: 'גילאים', value: p.ages || '—' },
-      { label: 'אורך הסדנא', value: p.duration || '—' },
-      { label: 'ציוד נדרש', value: p.equipment || '—' },
-      { label: 'צרכים טכניים', value: p.techNeeds || '—' },
-      { label: 'מקום מגורים', value: p.location || '—' },
-      { label: 'איך הגיע/ה', value: p.howCame || '—' },
-      { label: 'הערות', value: p.notes || '—' },
-    ].map(function(r) {
-      return '<div class="detail-row"><div class="detail-row-label">' + r.label + '</div><div class="detail-row-value">' + r.value + '</div></div>';
-    }).join('');
-
-    return '<div class="instructor-card" id="instr-' + p.id + '">' +
-      '<div class="instructor-header" onclick="toggleInstructor(this)" data-id="' + p.id + '"> ' +
-        '<div><div class="instructor-name">' + p.name + '</div><div class="instructor-topic">' + (p.topic || '—') + '</div></div>' +
-        '<div style="font-size:13px;color:var(--text-muted)">' + (p.ages || '—') + '</div>' +
-        '<div style="font-size:13px;color:var(--text-muted)">' + (p.artField || '—') + '</div>' +
-        '<div style="font-size:12px;color:var(--accent)">' + availDays.map(function(d){ return 'יום ' + d.label; }).join(', ') + '</div>' +
-      '</div>' +
-      '<div class="instructor-detail" id="detail-' + p.id + '">' +
-        rows +
-        '<div class="detail-row"><div class="detail-row-label">זמינות</div><div class="detail-row-value" style="flex:1">' + availHTML + '</div></div>' +
-      '</div>' +
-    '</div>';
-  }).join('');
-}
-
-function toggleInstructor(el) {
-  var id = el.getAttribute('data-id');
-  var detail = document.getElementById('detail-' + id);
-  if (detail) detail.classList.toggle('open');
-}
 
 
 function loadWAGroupsCache() {
@@ -1213,10 +1058,8 @@ function exportScheduleImage() {
 
 var currentMsgType = 'early';
 
-function setMsgType(type, btn) {
+function setMsgType(type) {
   currentMsgType = type;
-  document.querySelectorAll('#view-wa .filter-btn').forEach(function(b) { b.classList.remove('active'); });
-  btn.classList.add('active');
   generateWAMessage();
 }
 
@@ -1304,7 +1147,7 @@ function buildDateFilterWidget(containerId, callbackName) {
     var pa = a.split('/'), pb = b.split('/');
     var da = new Date(parseInt(pa[2]), parseInt(pa[1])-1, parseInt(pa[0]));
     var db = new Date(parseInt(pb[2]), parseInt(pb[1])-1, parseInt(pb[0]));
-    return da - db;
+    return db - da;
   });
   container.innerHTML = '';
   if (dates.length === 0) return;
@@ -1333,10 +1176,9 @@ function buildDateFilterWidget(containerId, callbackName) {
   };
   document.addEventListener('click', function() { dropdown.style.display = 'none'; });
 
-  // "הכל"
   var allRow = document.createElement('div');
   allRow.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;color:var(--text-muted);font-size:13px;border-bottom:1px solid var(--border);margin-bottom:4px';
-  allRow.innerHTML = '<span style="width:16px;text-align:center;color:var(--accent)">' + (activeDateFilter.length === 0 ? '✓' : '') + '</span><span>הכל</span>';
+  allRow.innerHTML = '<span style="width:16px;text-align:center;color:var(--accent)">' + (activeDateFilter.length === 0 ? "\u2713" : '') + '</span><span>הכל</span>';
   allRow.onmouseover = function(){ this.style.background='var(--surface2)'; };
   allRow.onmouseout = function(){ this.style.background=''; };
   allRow.onclick = function(e) {
@@ -1351,7 +1193,7 @@ function buildDateFilterWidget(containerId, callbackName) {
     var isActive = activeDateFilter.length === 0 || activeDateFilter.indexOf(d) !== -1;
     var row = document.createElement('div');
     row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--text)';
-    row.innerHTML = '<span style="width:16px;text-align:center;color:var(--accent)">' + (isActive ? '✓' : '') + '</span><span>' + d + '</span>';
+    row.innerHTML = '<span style="width:16px;text-align:center;color:var(--accent)">' + (isActive ? "\u2713" : '') + '</span><span>' + d + '</span>';
     row.onmouseover = function(){ this.style.background='var(--surface2)'; };
     row.onmouseout = function(){ this.style.background=''; };
     row.onclick = (function(date) {
