@@ -260,7 +260,6 @@
   <div class="view" id="view-zoom">
     <div class="page-title">ניהול חשבונות זום</div>
     <div id="zoom-date-filter"></div>
-    <div style="margin-bottom:16px"><label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);cursor:pointer"><input type="checkbox" id="zoom-show-past" onchange="renderZoomView()" style="accent-color:var(--accent)"> הצג זומים שכבר היו</label></div>
     <div class="zoom-grid" id="zoom-grid"></div>
   </div>
 
@@ -314,7 +313,7 @@ var instructors = [];
 var waGroupsCache = [];
 var msgSettings = {};
 var currentFilter = 'all';
-var activeDateFilter = [];
+var activeWeekKey = null; // null = השבוע הנוכחי
 
 var AUDIENCE_COLORS = {
   'ילדים': 'badge-green', 'נוער': 'badge-blue',
@@ -484,13 +483,7 @@ function showView(name, btn) {
 
 function renderWorkshops() {
   buildDateFilterWidget('workshops-date-filter', 'renderWorkshops');
-  var today = new Date(); today.setHours(0,0,0,0);
-  var showAll = document.getElementById('show-all-dates') && document.getElementById('show-all-dates').checked;
-  var baseList = showAll ? workshops : workshops.filter(function(w) {
-    if (!w.date) return true;
-    var d = parseDate(w.date);
-    return !d || d >= today;
-  });
+  var baseList = workshops;
   var filtered = currentFilter === 'all' ? baseList : baseList.filter(function(w) { return w.audience === currentFilter; });
   filtered = filtered.filter(function(w) { return isDateVisible(w.dateStr); });
   filtered.sort(function(a, b) {
@@ -510,9 +503,7 @@ function renderWorkshops() {
     '<div class="stat-card"><div class="stat-num" style="color:var(--accent2)">' + zoomAccs.length + '</div><div class="stat-label">חשבונות זום</div></div>' +
     '<div class="stat-card"><div class="stat-num" style="color:var(--yellow)">' + workshops.filter(function(w){return w.waGroup;}).length + '</div><div class="stat-label">עם קבוצת ווטסאפ</div></div>';
 
-  var showAllChecked = document.getElementById('show-all-dates') && document.getElementById('show-all-dates').checked;
-  var filtersHtml = '<label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);cursor:pointer"><input type="checkbox" id="show-all-dates" ' + (showAllChecked ? 'checked' : '') + ' onchange="renderWorkshops()" style="accent-color:var(--accent)"> הצג ימים שעברו</label>';
-  filtersHtml += '<button class="filter-btn ' + (currentFilter==='all'?'active':'') + '" onclick="filterWorkshops(\'all\')">הכל</button>';
+  var filtersHtml = '<button class="filter-btn ' + (currentFilter==='all'?'active':'') + '" onclick="filterWorkshops(\'all\')">הכל</button>';
   audiences.forEach(function(a) {
     filtersHtml += '<button class="filter-btn ' + (currentFilter===a?'active':'') + '" onclick="filterWorkshops(\'' + a + '\')">' + a + '</button>';
   });
@@ -619,9 +610,7 @@ function renderWAView() {
   buildDateFilterWidget('wa-date-filter', 'renderWAView');
   var sel = document.getElementById('wa-select');
   sel.innerHTML = '<option value="">— בחר סדנה —</option>';
-  var todayWA = new Date(); todayWA.setHours(0,0,0,0);
   workshops.forEach(function(w) {
-    if (w.date) { var dWA = parseDate(w.date); if (dWA && dWA < todayWA) return; }
     if (!isDateVisible(w.dateStr)) return;
     sel.innerHTML += '<option value="' + w.id + '">' + w.name + ' | יום ' + (w.day||'?') + ' ' + (w.start||'') + '</option>';
   });
@@ -784,11 +773,8 @@ function renderZoomView() {
       var DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שישי'];
       var html = '';
       accounts.forEach(function(acc) {
-        var showPast = document.getElementById('zoom-show-past') && document.getElementById('zoom-show-past').checked;
-        var todayZoom = new Date(); todayZoom.setHours(0,0,0,0);
         var accWs = workshops.filter(function(w) {
           if (w.zoomAcc !== acc.name) return false;
-          if (!showPast && w.date) { var d = parseDate(w.date); if (d && d < todayZoom) return false; }
           if (!isDateVisible(w.dateStr)) return false;
           return true;
         });
@@ -1131,44 +1117,65 @@ function renderDaily() {
 }
 
 
+function getWeekKey(dateStr) {
+  if (!dateStr) return null;
+  var parts = dateStr.split('/');
+  if (parts.length !== 3) return null;
+  var d = new Date(parseInt(parts[2]), parseInt(parts[1])-1, parseInt(parts[0]));
+  var day = d.getDay();
+  d.setDate(d.getDate() - day);
+  d.setHours(0,0,0,0);
+  return d.getTime();
+}
+
+function getWeekLabel(key) {
+  var start = new Date(key);
+  var end = new Date(key);
+  end.setDate(end.getDate() + 4);
+  return start.getDate() + '/' + (start.getMonth()+1) + ' – ' + end.getDate() + '/' + (end.getMonth()+1);
+}
+
 function isDateVisible(dateStr) {
-  if (activeDateFilter.length === 0) return true;
-  return activeDateFilter.indexOf(dateStr) !== -1;
+  if (activeWeekKey === null) {
+    // השבוע הנוכחי
+    var today = new Date(); today.setHours(0,0,0,0);
+    var day = today.getDay();
+    today.setDate(today.getDate() - day);
+    return getWeekKey(dateStr) === today.getTime();
+  }
+  return getWeekKey(dateStr) === activeWeekKey;
 }
 
 function buildDateFilterWidget(containerId, callbackName) {
   var container = document.getElementById(containerId);
   if (!container) return;
-  var dates = [];
-  workshops.forEach(function(w) {
-    if (w.dateStr && dates.indexOf(w.dateStr) === -1) dates.push(w.dateStr);
-  });
-  dates.sort(function(a, b) {
-    var pa = a.split('/'), pb = b.split('/');
-    var da = new Date(parseInt(pa[2]), parseInt(pa[1])-1, parseInt(pa[0]));
-    var db = new Date(parseInt(pb[2]), parseInt(pb[1])-1, parseInt(pb[0]));
-    return db - da;
-  });
-  container.innerHTML = '';
-  if (dates.length === 0) return;
 
-  var selectedCount = activeDateFilter.length > 0 ?
-    dates.filter(function(d){ return activeDateFilter.indexOf(d) !== -1; }).length : dates.length;
-  var btnLabel = activeDateFilter.length > 0 ?
-    'סנן תאריך (' + selectedCount + '/' + dates.length + ') ▾' : 'סנן לפי תאריך ▾';
+  // אסוף שבועות ייחודיים
+  var weekKeys = [];
+  workshops.forEach(function(w) {
+    var k = getWeekKey(w.dateStr);
+    if (k !== null && weekKeys.indexOf(k) === -1) weekKeys.push(k);
+  });
+  weekKeys.sort(function(a,b){ return b-a; }); // יורד — קרוב יותר למעלה
+
+  container.innerHTML = '';
+  if (weekKeys.length === 0) return;
+
+  // קבע activeWeekKey לשבוע הנוכחי אם לא הוגדר
+  var today = new Date(); today.setHours(0,0,0,0);
+  var day = today.getDay(); today.setDate(today.getDate() - day);
+  var thisWeek = today.getTime();
+  if (activeWeekKey === null) activeWeekKey = thisWeek;
 
   var wrapper = document.createElement('div');
   wrapper.style.cssText = 'position:relative;display:inline-block;margin-bottom:16px';
 
   var toggleBtn = document.createElement('button');
-  toggleBtn.textContent = btnLabel;
-  toggleBtn.style.cssText = 'background:var(--surface2);border:1px solid ' +
-    (activeDateFilter.length > 0 ? 'var(--accent)' : 'var(--border)') + ';color:' +
-    (activeDateFilter.length > 0 ? 'var(--accent)' : 'var(--text-muted)') +
-    ';font-family:Heebo,sans-serif;font-size:13px;padding:7px 16px;border-radius:20px;cursor:pointer';
+  toggleBtn.textContent = 'שבוע ' + getWeekLabel(activeWeekKey) + ' ▾';
+  toggleBtn.style.cssText = 'background:var(--surface2);border:1px solid var(--accent);color:var(--accent);font-family:Heebo,sans-serif;font-size:13px;padding:7px 16px;border-radius:20px;cursor:pointer';
 
   var dropdown = document.createElement('div');
-  dropdown.style.cssText = 'display:none;position:absolute;top:calc(100% + 6px);right:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px;z-index:100;min-width:180px;box-shadow:0 8px 24px rgba(0,0,0,0.4)';
+  dropdown.style.cssText = 'display:none;position:absolute;top:calc(100% + 6px);right:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px;z-index:100;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,0.4)';
 
   toggleBtn.onclick = function(e) {
     e.stopPropagation();
@@ -1176,41 +1183,25 @@ function buildDateFilterWidget(containerId, callbackName) {
   };
   document.addEventListener('click', function() { dropdown.style.display = 'none'; });
 
-  var allRow = document.createElement('div');
-  allRow.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;color:var(--text-muted);font-size:13px;border-bottom:1px solid var(--border);margin-bottom:4px';
-  allRow.innerHTML = '<span style="width:16px;text-align:center;color:var(--accent)">' + (activeDateFilter.length === 0 ? "\u2713" : '') + '</span><span>הכל</span>';
-  allRow.onmouseover = function(){ this.style.background='var(--surface2)'; };
-  allRow.onmouseout = function(){ this.style.background=''; };
-  allRow.onclick = function(e) {
-    e.stopPropagation();
-    activeDateFilter = [];
-    buildDateFilterWidget(containerId, callbackName);
-    window[callbackName]();
-  };
-  dropdown.appendChild(allRow);
-
-  dates.forEach(function(d) {
-    var isActive = activeDateFilter.length === 0 || activeDateFilter.indexOf(d) !== -1;
+  weekKeys.forEach(function(k) {
+    var isActive = k === activeWeekKey;
     var row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--text)';
-    row.innerHTML = '<span style="width:16px;text-align:center;color:var(--accent)">' + (isActive ? "\u2713" : '') + '</span><span>' + d + '</span>';
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:13px;color:' + (isActive ? 'var(--accent)' : 'var(--text)');
+    if (k === thisWeek) {
+      row.innerHTML = '<span style="width:16px;text-align:center;color:var(--accent)">' + (isActive ? '✓' : '') + '</span><span>השבוע הנוכחי (' + getWeekLabel(k) + ')</span>';
+    } else {
+      row.innerHTML = '<span style="width:16px;text-align:center;color:var(--accent)">' + (isActive ? '✓' : '') + '</span><span>שבוע ' + getWeekLabel(k) + '</span>';
+    }
     row.onmouseover = function(){ this.style.background='var(--surface2)'; };
     row.onmouseout = function(){ this.style.background=''; };
-    row.onclick = (function(date) {
+    row.onclick = (function(key) {
       return function(e) {
         e.stopPropagation();
-        if (activeDateFilter.length === 0) {
-          activeDateFilter = dates.filter(function(x){ return x !== date; });
-        } else {
-          var idx = activeDateFilter.indexOf(date);
-          if (idx !== -1) activeDateFilter.splice(idx, 1);
-          else activeDateFilter.push(date);
-          if (activeDateFilter.length === dates.length) activeDateFilter = [];
-        }
+        activeWeekKey = key;
         buildDateFilterWidget(containerId, callbackName);
         window[callbackName]();
       };
-    })(d);
+    })(k);
     dropdown.appendChild(row);
   });
 
@@ -1218,6 +1209,7 @@ function buildDateFilterWidget(containerId, callbackName) {
   wrapper.appendChild(dropdown);
   container.appendChild(wrapper);
 }
+
 
 function showToast(msg) {
   var t = document.getElementById('toast');
