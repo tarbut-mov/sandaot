@@ -16,12 +16,6 @@
   .cat-btn { display: flex; align-items: center; justify-content: space-between; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; margin-bottom: 10px; text-decoration: none; color: var(--text); cursor: pointer; transition: border-color 0.15s; }
   .cat-btn:hover { border-color: var(--accent); }
   .cat-name { font-weight: 700; font-size: 16px; }
-  .badge { display: inline-block; padding: 3px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
-  .badge-green  { background: rgba(79,209,138,0.15); color: var(--green); }
-  .badge-blue   { background: rgba(79,142,247,0.15); color: var(--accent); }
-  .badge-yellow { background: rgba(247,201,79,0.15);  color: var(--yellow); }
-  .badge-purple { background: rgba(176,126,247,0.15); color: var(--purple); }
-  .badge-orange { background: rgba(247,119,79,0.15);  color: var(--orange); }
   .btn-wa { display: inline-flex; align-items: center; gap: 10px; background: #25D366; color: white; font-family: 'Heebo', sans-serif; font-size: 16px; font-weight: 700; padding: 14px 28px; border-radius: 12px; text-decoration: none; transition: opacity 0.15s; margin-top: 8px; }
   .btn-wa:hover { opacity: 0.85; }
   .btn-back { background: none; border: none; color: var(--muted); font-family: 'Heebo', sans-serif; font-size: 13px; cursor: pointer; margin-top: 16px; padding: 8px; display: block; margin-left: auto; margin-right: auto; }
@@ -40,19 +34,63 @@
 <script>
 var SHEET_ID = '1A6EPgnd0cax-KDjGtV1D1mXnhNE1mie1FCJLljybEgI';
 var SHEET_NAME = 'קישורים לקבוצות ווטסאפ';
-var BADGE = { 'ילדים':'badge-green','נוער':'badge-blue','אזרחים ותיקים':'badge-yellow','אקו':'badge-purple','ערבית':'badge-orange' };
+var SETTINGS_SHEET_NAME = 'פורמט הודעה';
 var groupsData = [];
+var audienceColors = {}; // נטען מהשיט
+
+function loadSettings(callback) {
+  var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID +
+    '/gviz/tq?tqx=out:json&headers=1&sheet=' + encodeURIComponent(SETTINGS_SHEET_NAME) + '&t=' + Date.now();
+  fetch(url)
+    .then(function(r) { return r.text(); })
+    .then(function(text) {
+      var json = text.replace(/^\/\*[^*]*\*\/\s*/, '').replace(/^[\s\S]*?\(/, '').replace(/\);?\s*$/, '');
+      var data = JSON.parse(json);
+      var h = [];
+      if (data.table.cols) data.table.cols.forEach(function(c) { h.push(c && c.label ? c.label.trim() : ''); });
+      var ki = h.indexOf('מפתח'), vi = h.indexOf('ערך');
+      if (ki !== -1 && vi !== -1) {
+        data.table.rows.forEach(function(row) {
+          if (!row.c) return;
+          var key = (row.c[ki] && row.c[ki].v) ? String(row.c[ki].v).trim() : '';
+          var val = (row.c[vi] && row.c[vi].v) ? String(row.c[vi].v).trim() : '';
+          if (key.indexOf('צבע_') === 0 && val) {
+            audienceColors[key.replace('צבע_', '')] = val;
+          }
+        });
+      }
+      callback();
+    }).catch(function() { callback(); });
+}
+
+function getAudienceColor(audience) {
+  if (audienceColors[audience]) return audienceColors[audience];
+  if (audience.indexOf('ילדים') !== -1 && audience.indexOf('ערבית') !== -1) return '#4fd4d4';
+  if (audience.indexOf('נוער') !== -1 && audience.indexOf('ערבית') !== -1) return '#f7774f';
+  if (audience.indexOf('ילדים') !== -1) return '#4fd18a';
+  if (audience.indexOf('נוער') !== -1) return '#4f8ef7';
+  if (audience.indexOf('אזרחים') !== -1) return '#f7c94f';
+  if (audience.indexOf('אקו') !== -1) return '#b07ef7';
+  return '#4f8ef7';
+}
+
+function getBadgeHtml(audience) {
+  var color = getAudienceColor(audience);
+  return '<span style="display:inline-block;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:700;background:' + color + '22;color:' + color + '">' + audience + '</span>';
+}
 
 function init() {
-  var params = new URLSearchParams(window.location.search);
-  var audience = params.get('q') || '';
-  loadGroups(function(groups) {
-    groupsData = groups;
-    if (audience) {
-      showGroup(audience);
-    } else {
-      showCategories();
-    }
+  loadSettings(function() {
+    var params = new URLSearchParams(window.location.search);
+    var audience = params.get('q') || '';
+    loadGroups(function(groups) {
+      groupsData = groups;
+      if (audience) {
+        showGroup(audience);
+      } else {
+        showCategories();
+      }
+    });
   });
 }
 
@@ -62,7 +100,7 @@ function loadGroups(callback) {
   fetch(url)
     .then(function(r) { return r.text(); })
     .then(function(text) {
-      var json = text.replace(/^[^(]+\(/, '').replace(/\);?$/, '');
+      var json = text.replace(/^\/\*[^*]*\*\/\s*/, '').replace(/^[\s\S]*?\(/, '').replace(/\);?\s*$/, '');
       var data = JSON.parse(json);
       var h = [];
       if (data.table.cols) data.table.cols.forEach(function(c) { h.push(c && c.label ? c.label.trim() : ''); });
@@ -99,12 +137,13 @@ function showCategories() {
   var btns = keys.map(function(aud) {
     var info = cats[aud];
     var isWarn = info.open === 0;
-    return '<a class="cat-btn" href="?q=' + encodeURIComponent(aud) + '">' +
+    var color = getAudienceColor(aud);
+    return '<a class="cat-btn" href="?q=' + encodeURIComponent(aud) + '" style="border-right:3px solid ' + color + '">' +
       '<div style="text-align:right">' +
         '<div class="cat-name">' + aud + '</div>' +
         (isWarn ? '<div class="status-warn">⚠️ כמעט מלאה</div>' : '') +
       '</div>' +
-      '<span class="badge ' + (BADGE[aud]||'badge-blue') + '">' + aud + '</span>' +
+      getBadgeHtml(aud) +
     '</a>';
   }).join('');
   document.getElementById('card').innerHTML =
@@ -128,8 +167,8 @@ function showGroup(audience) {
   var warn = best.status === 'כמעט מלאה' ? '<div style="color:var(--yellow);font-size:13px;margin-bottom:16px">⚠️ הקבוצה כמעט מלאה</div>' : '';
   document.getElementById('card').innerHTML =
     '<div class="logo">💬</div>' +
-    '<span class="badge ' + (BADGE[audience]||'badge-blue') + '" style="display:inline-block;margin-bottom:16px">' + audience + '</span>' +
-    '<div class="title" style="margin-bottom:8px">' + (best.name || audience) + '</div>' +
+    getBadgeHtml(audience) +
+    '<div class="title" style="margin-bottom:8px;margin-top:12px">' + (best.name || audience) + '</div>' +
     warn +
     '<div class="subtitle">מיד תועבר/י אוטומטית.<br>אם לא קרה כלום — לחץ/י על הכפתור.</div>' +
     '<a class="btn-wa" href="' + best.link + '">' +
