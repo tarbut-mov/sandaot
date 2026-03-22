@@ -518,7 +518,7 @@ function renderWorkshops() {
   grid.innerHTML = filtered.map(function(w) {
     return '<div class="workshop-card" onclick="openDetail(\'' + w.id + '\')">' +
       '<div><div class="workshop-name">' + w.name + '</div><div class="workshop-desc">' + (w.desc||'—') + '</div></div>' +
-      '<div><span class="badge ' + (AUDIENCE_COLORS[w.audience]||'badge-blue') + '">' + (w.audience||'—') + '</span>' + (w.ages ? '<div style="font-size:11px;color:var(--text-muted);margin-top:4px">' + w.ages + '</div>' : '') + '</div>' +
+      '<div><span style="' + getAudienceBadgeStyle(w.audience||'') + '">' + (w.audience||'—') + '</span>' + (w.ages ? '<div style="font-size:11px;color:var(--text-muted);margin-top:4px">' + w.ages + '</div>' : '') + '</div>' +
       '<div class="time-block">' + (w.isToday ? '<span style="color:var(--green);font-size:11px">היום</span> ' : 'יום ' + (w.day||'')) + ' ' + (w.dateStr||'') + '<span>' + (w.start||'—') + ' – ' + (w.end||'—') + '</span></div>' +
       '<div style="font-size:14px">' + (w.host||'—') + '<br><span style="color:var(--text-muted);font-size:12px">' + (w.hostPhone||'') + '</span></div>' +
       '<div><span class="zoom-badge">' + (w.zoomAcc||'—') + '</span></div>' +
@@ -535,7 +535,7 @@ function openDetail(id) {
   var html = '<div class="modal-title">' + w.name + '</div>';
   if (w.desc) html += '<p style="color:var(--text-muted);margin-bottom:20px;font-size:14px">' + w.desc + '</p>';
   html += '<div class="detail-grid">';
-  html += '<div><div class="detail-item-label">קהל יעד</div><div class="detail-item-value"><span class="badge ' + (AUDIENCE_COLORS[w.audience]||'badge-blue') + '">' + (w.audience||'—') + '</span></div></div>';
+  html += '<div><div class="detail-item-label">קהל יעד</div><div class="detail-item-value"><span style="' + getAudienceBadgeStyle(w.audience||'') + '">' + (w.audience||'—') + '</span></div></div>';
   if (w.ages) html += '<div><div class="detail-item-label">גילאים</div><div class="detail-item-value" style="font-size:14px;font-weight:500">' + w.ages + '</div></div>';
   html += '<div><div class="detail-item-label">תאריך</div><div class="detail-item-value">' + (w.isToday ? '🟢 היום — ' : '') + 'יום ' + (w.day||'—') + ' ' + (w.dateStr||'') + '</div></div>';
   html += '<div><div class="detail-item-label">שעות</div><div class="detail-item-value">' + (w.start||'—') + ' – ' + (w.end||'—') + '</div></div>';
@@ -871,6 +871,25 @@ function getSetting(key, fallback) {
   return msgSettings[key] || fallback;
 }
 
+function getAudienceColor(audience) {
+  // תחילה — בדוק אם יש צבע מהשיט
+  var fromSheet = getSetting('צבע_' + audience, '');
+  if (fromSheet) return fromSheet;
+  // fallback לפי מילת מפתח
+  if (audience.indexOf('ילדים') !== -1 && audience.indexOf('ערבית') !== -1) return '#4fd4d4';
+  if (audience.indexOf('נוער') !== -1 && audience.indexOf('ערבית') !== -1) return '#f7774f';
+  if (audience.indexOf('ילדים') !== -1) return '#4fd18a';
+  if (audience.indexOf('נוער') !== -1) return '#4f8ef7';
+  if (audience.indexOf('אזרחים') !== -1) return '#f7c94f';
+  if (audience.indexOf('אקו') !== -1) return '#b07ef7';
+  return '#4f8ef7';
+}
+
+function getAudienceBadgeStyle(audience) {
+  var color = getAudienceColor(audience);
+  return 'display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;background:' + color + '22;color:' + color;
+}
+
 function formatAges(ages) {
   if (!ages) return '';
   // אם מכיל אותיות עבריות — כיתות, אחרת — גילאים
@@ -882,11 +901,6 @@ function formatAges(ages) {
 function renderSchedule() {
   buildDateFilterWidget('schedule-week-filter', 'renderSchedule');
   var DAYS = ['ראשון','שני','שלישי','רביעי','חמישי'];
-  var AUDIENCE_COLORS_MAP = {
-    'ילדים': '#4fd18a', 'נוער': '#4f8ef7', 'אזרחים ותיקים': '#f7c94f',
-    'אקו': '#b07ef7', 'ערבית': '#f7774f'
-  };
-
   // קבץ סדנאות לפי שבוע (ראשון בשבוע = ראשון)
   function getWeekStart(d) {
     var date = new Date(d);
@@ -974,7 +988,7 @@ function showWeekTab(key) {
       var cells = (week.days[day] || []).filter(function(w){ return w.start === time; });
       html += '<td style="' + cellStyle + '">';
       cells.forEach(function(w) {
-        var color = AUDIENCE_COLORS_MAP[w.audience] || '#4f8ef7';
+        var color = getAudienceColor(w.audience||'');
         html += '<div style="background:' + color + '18;border-right:3px solid ' + color + ';border-radius:6px;padding:8px 10px;margin-bottom:6px">' +
           '<div style="font-weight:700;font-size:13px;color:#e8eaf0">' + w.name + '</div>' +
           '<div style="font-size:11px;color:' + color + ';margin-top:2px">' + (w.audience||'') + '</div>' +
@@ -1078,11 +1092,10 @@ function renderDaily() {
     return;
   }
 
-  var AUDIENCE_COLORS_MAP = { 'ילדים':'#4fd18a','נוער':'#4f8ef7','אזרחים ותיקים':'#f7c94f','אקו':'#b07ef7','ערבית':'#f7774f' };
   var html = '';
 
   todayWs.forEach(function(w) {
-    var color = AUDIENCE_COLORS_MAP[w.audience] || '#4f8ef7';
+    var color = getAudienceColor(w.audience||'');
     var alerts = [];
     if (!w.zoomLink) alerts.push('⚠️ חסר קישור זום');
     if (!w.tech) alerts.push('⚠️ חסר איש טכני');
